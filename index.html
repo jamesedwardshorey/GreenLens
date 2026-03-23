@@ -265,7 +265,7 @@ tr:hover td{background:rgba(255,255,255,.015);}
 <div class="tbl-wrap" id="tableView" style="display:none">
   <table>
     <thead><tr>
-      <th style="width:36px;text-align:center;" title="Checked">&#x2714;</th>
+      <th onclick="colSortBy('verified')" class="th-sort" style="width:60px;text-align:center;" title="Verification">Verified <span class="sort-arrow" id="sa-verified"></span></th>
       <th onclick="colSortBy('name')" class="th-sort">Company <span class="sort-arrow" id="sa-name"></span></th>
       <th onclick="colSortBy('status')" class="th-sort">Status <span class="sort-arrow" id="sa-status"></span></th>
       <th onclick="colSortBy('suspage')" class="th-sort">Sustainability Page <span class="sort-arrow" id="sa-suspage"></span></th>
@@ -292,7 +292,13 @@ tr:hover td{background:rgba(255,255,255,.015);}
         <div style="font-size:1.05rem;font-weight:700;color:var(--text1);" id="pName"></div>
         <div id="pWebsite" style="font-size:.78rem;margin-top:.35rem;"></div>
       </div>
-      <button onclick="closePanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;line-height:1;padding:.2rem;">&#x2715;</button>
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <button id="btnRemoveCompany" title="Remove from project"
+          style="background:none;border:1px solid rgba(248,113,113,.25);border-radius:5px;cursor:pointer;color:var(--text3);font-size:.68rem;padding:3px 8px;"
+          onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'"
+          onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.25)'">&#x2715; Remove</button>
+        <button onclick="closePanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;line-height:1;padding:.2rem;">&#x2715;</button>
+      </div>
     </div>
     <div class="pf-label">Sustainability Page</div>
     <div id="pUrl" style="font-size:.82rem;margin-bottom:.6rem;word-break:break-all;"></div>
@@ -473,13 +479,34 @@ async function renderProjectList() {
     list.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:.5rem 0;">No projects yet — create one below</div>';
     return;
   }
-  list.innerHTML = data.map(p => `
+  // Fetch counts for all projects in one query
+  const projectIds = data.map(p => p.id);
+  const { data: countData } = await _supa
+    .from('greenlens_results')
+    .select('project_id, verified_by')
+    .in('project_id', projectIds);
+
+  const companyCounts = {}, verifiedCounts = {};
+  (countData || []).forEach(row => {
+    companyCounts[row.project_id] = (companyCounts[row.project_id] || 0) + 1;
+    if (row.verified_by) verifiedCounts[row.project_id] = (verifiedCounts[row.project_id] || 0) + 1;
+  });
+
+  list.innerHTML = data.map(p => {
+    const total    = companyCounts[p.id] || 0;
+    const verified = verifiedCounts[p.id] || 0;
+    const countStr = total
+      ? `<span style="font-size:.72rem;color:var(--text3);">${total} ${total===1?'company':'companies'}</span>`
+        + (verified ? `<span style="font-size:.72rem;color:var(--green);margin-left:.4rem;">· ${verified} verified</span>` : '')
+      : `<span style="font-size:.72rem;color:var(--text3);">Empty</span>`;
+    return `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.7rem 1rem;cursor:pointer;transition:border-color .15s;"
          onmouseover="this.style.borderColor='var(--sky)'" onmouseout="this.style.borderColor='var(--border2)'"
          onclick="openProject('${p.id}','${p.name.replace(/'/g,"\\'")}')">
       <div>
         <div style="font-weight:600;color:var(--text1);font-size:.9rem;">${p.name}</div>
-        <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Created ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
+        <div style="margin-top:3px;display:flex;gap:.3rem;align-items:center;">${countStr}</div>
+        <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">Created ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
       </div>
       <div style="display:flex;align-items:center;gap:.5rem;">
         <span style="font-size:.75rem;color:var(--sky);">Open →</span>
@@ -487,7 +514,8 @@ async function renderProjectList() {
           style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 6px;border-radius:4px;"
           onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function createProject() {
@@ -514,6 +542,15 @@ async function openProject(id, name) {
   document.getElementById('projectOverlay').style.display = 'none';
   const label = document.getElementById('activeProjectName');
   if (label) label.textContent = name;
+  // Show UI immediately with a loading indicator while data fetches
+  document.getElementById('statsBar').style.display  = 'flex';
+  document.getElementById('toolbar').style.display   = 'flex';
+  document.getElementById('btnRun').style.display    = 'inline-block';
+  document.getElementById('btnClear').style.display  = 'inline-block';
+  document.getElementById('cfgBar').style.display    = 'flex';
+  document.getElementById('uploadSection').style.display = 'none';
+  const tbody = document.getElementById('tBody');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text3);font-size:.82rem;">Loading ${name}…</td></tr>`;
   await loadResultsFromDb();
 }
 
@@ -548,20 +585,29 @@ async function saveResultToDb(r) {
     confidence: r.confidence || null,
     confidence_reasons: r.confidence_reasons || null,
     extraction_date: r.extraction_date || null,
-    user_checked: r.user_checked || false,
+    verified_by: r.verified_by || null,
+    verified_at: r.verified_at || null,
     user_notes: r.user_notes || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
 
+function getInitials(email) {
+  if (!email) return '?';
+  const name = email.split('@')[0].replace(/[._-]+/g,' ').trim();
+  const parts = name.split(' ').filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
 async function saveUserFields(r) {
-  // Lightweight save — only updates the two user-editable fields
   if (!_supaUser || !_activeProject) return;
   await _supa.from('greenlens_results').upsert({
     project_id: _activeProject.id,
     user_id: _supaUser.id,
     company: r.company,
-    user_checked: r.user_checked || false,
+    verified_by: r.verified_by || null,
+    verified_at: r.verified_at || null,
     user_notes: r.user_notes || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
@@ -588,7 +634,9 @@ async function loadResultsFromDb() {
       return mapped;
     });
   }
-  document.getElementById('uploadSection').style.display = allResults.length ? 'none' : 'block';
+  // Always hide upload section when a project is open — results or not
+  // Users add companies via the upload section only when they explicitly want to
+  document.getElementById('uploadSection').style.display = 'none';
   document.getElementById('statsBar').style.display     = 'flex';
   document.getElementById('toolbar').style.display      = 'flex';
   document.getElementById('btnRun').style.display       = 'inline-block';
@@ -2101,6 +2149,31 @@ function nzSearchUrl(company, website) {
 }
 
 // ── Reject / override functions ───────────────────────────────────────────────
+async function removeFromProject(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  if (!confirm(`Remove "${r.company}" from this project? This cannot be undone.`)) return;
+  // Delete from Supabase
+  if (_activeProject) {
+    await _supa.from('greenlens_results')
+      .delete()
+      .eq('project_id', _activeProject.id)
+      .eq('company', r.company);
+  }
+  // Remove from local state
+  allResults = allResults.filter(x => x._idx !== idx);
+  delete _rByIdx[idx];
+  delete db[dbKey(r)];
+  // Re-index
+  allResults.forEach((x, i) => { x._idx = i; _rByIdx[i] = x; });
+  closePanel();
+  applyFilters();
+  updateStats(allResults);
+  toast(`Removed: ${r.company}`);
+  // Refresh project counts in picker if it was open
+  if (document.getElementById('projectOverlay').style.display !== 'none') renderProjectList();
+}
+
 function rejectWebsite(idx) {
   const r = _rByIdx[idx];
   if (!r) return;
@@ -2507,7 +2580,7 @@ function loadRows(rows) {
     'sustainability_summary':'sustainability_summary','certifications':'certifications',
     'emissions_reduction_target':'emissions_reduction_target','carbon_data':'carbon_data',
     'key_initiatives':'key_initiatives',
-    'user_checked':'user_checked','user_notes':'user_notes',
+    'verified_by':'verified_by','verified_at':'verified_at','user_notes':'user_notes',
   };
 
   allResults = rows
@@ -2588,7 +2661,7 @@ function colSortBy(key) {
     currentSort.key = key;
     currentSort.dir = 'asc';
   }
-  ['checked','name','status','suspage','nz','summary','certs','maturity','reason','date','doc','confidence'].forEach(k => {
+  ['verified','name','status','suspage','nz','summary','certs','maturity','reason','date','doc','confidence'].forEach(k => {
     const el = document.getElementById('sa-'+k);
     if (el) el.className = 'sort-arrow' + (k===key ? ' '+currentSort.dir : '');
   });
@@ -2601,7 +2674,7 @@ function sortResults(data) {
   const confRank = { High: 3, Medium: 2, Low: 1, '': 0 };
   return [...data].sort((a,b) => {
     switch(key) {
-      case 'checked':  return flip*((a.user_checked ? 1 : 0) - (b.user_checked ? 1 : 0));
+      case 'verified': return flip*((a.verified_by ? 1 : 0) - (b.verified_by ? 1 : 0));
       case 'name':     return flip*(a.company||'').localeCompare(b.company||'');
       case 'status':   return flip*(a.status||'').localeCompare(b.status||'');
       case 'suspage':  return flip*((a.sustainability_url?1:0)-(b.sustainability_url?1:0));
@@ -2782,13 +2855,18 @@ function renderTable(data) {
     })();
 
     tr.innerHTML = `
-      <td style="text-align:center;vertical-align:middle;" onclick="event.stopPropagation()">
-        <input type="checkbox" ${r.user_checked ? 'checked' : ''} title="Mark as checked"
-          style="width:15px;height:15px;accent-color:var(--green);cursor:pointer;"
-          onchange="toggleChecked(${r._idx},this.checked)">
+      <td style="text-align:center;vertical-align:middle;cursor:pointer;" onclick="event.stopPropagation();toggleVerified(${r._idx})" title="${r.verified_by ? 'Verified by ' + r.verified_by + ' on ' + new Date(r.verified_at).toLocaleDateString('en-GB') + ' — click to clear' : 'Click to mark as verified'}">
+        ${r.verified_by
+          ? `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:4px;padding:2px 5px;font-size:.62rem;font-weight:600;font-family:var(--mono);white-space:nowrap;">${getInitials(r.verified_by)} ${new Date(r.verified_at).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'}).replace('/','/')}</span>`
+          : `<span style="display:inline-block;width:28px;height:18px;border:1px dashed var(--border2);border-radius:4px;"></span>`}
       </td>
       <td onclick="event.stopPropagation()">
-        <div class="td-co" title="${r.company}" style="cursor:pointer;" onclick="openPanel(_rByIdx[${r._idx}])">${r.company||'&#x2014;'}</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
+          <div class="td-co" title="${r.company}" style="cursor:pointer;flex:1;" onclick="openPanel(_rByIdx[${r._idx}])">${r.company||'&#x2014;'}</div>
+          <button onclick="event.stopPropagation();removeFromProject(${r._idx})" title="Remove from project"
+            style="background:none;border:none;cursor:pointer;color:var(--border2);font-size:.7rem;padding:0 2px;flex-shrink:0;line-height:1;margin-top:1px;"
+            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--border2)'">&#x2715;</button>
+        </div>
         <div class="td-sub">${websiteHtml}</div>
         ${r.status !== 'Running…' ? `
         <div class="rerun-wrap">
@@ -2880,6 +2958,9 @@ function updateStats(data) {
 function openPanel(r) {
   if (!r) return;
   document.getElementById('pName').textContent = r.company||'&#x2014;';
+  // Wire up the remove button with the correct idx
+  const removeBtn = document.getElementById('btnRemoveCompany');
+  if (removeBtn) removeBtn.onclick = () => removeFromProject(r._idx);
 
   // Website display with reject button
   const pWebEl = document.getElementById('pWebsite');
@@ -3167,12 +3248,17 @@ function openPanel(r) {
   reviewSection.style.cssText = 'margin-top:1rem;border-top:1px solid var(--border2);padding-top:1rem;';
   reviewSection.innerHTML = `
     <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.75rem;">&#x270F;&#xFE0F; Your Review</div>
-    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.85rem;">
-      <input type="checkbox" id="panelChecked_${r._idx}" ${r.user_checked ? 'checked' : ''}
-        style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;"
-        onchange="toggleChecked(${r._idx},this.checked);document.querySelectorAll('input[type=checkbox]').forEach(cb=>{ if(cb.dataset.idx=='${r._idx}') cb.checked=this.checked; })">
-      <span style="font-size:.82rem;color:var(--text1);">Checked / reviewed</span>
-    </label>
+    <div style="margin-bottom:.85rem;">
+      ${r.verified_by
+        ? `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);border-radius:8px;padding:.55rem .8rem;">
+            <div>
+              <div style="font-size:.78rem;color:var(--green);font-weight:600;">✓ Verified</div>
+              <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">by ${r.verified_by} · ${new Date(r.verified_at).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+            </div>
+            <button class="btn" onclick="toggleVerified(${r._idx})" style="font-size:.7rem;padding:4px 10px;color:var(--red);">Clear</button>
+          </div>`
+        : `<button class="btn primary" onclick="toggleVerified(${r._idx})" style="width:100%;justify-content:center;font-size:.8rem;">✓ Mark as verified</button>`}
+    </div>
     <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Notes</div>
     <textarea id="notesInput_${r._idx}" rows="4" placeholder="Add notes about this company…"
       style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
@@ -3190,12 +3276,24 @@ function closePanel() {
   document.getElementById('overlay').classList.remove('open');
 }
 
-function toggleChecked(idx, checked) {
+function toggleVerified(idx) {
   const r = _rByIdx[idx];
   if (!r) return;
-  r.user_checked = checked;
+  if (r.verified_by) {
+    // Already verified — clear it
+    r.verified_by = null;
+    r.verified_at = null;
+  } else {
+    // Mark as verified by current user
+    r.verified_by = _supaUser?.email || 'unknown';
+    r.verified_at = new Date().toISOString();
+  }
   dbMerge(r);
   saveUserFields(r).catch(() => {});
+  applyFilters();
+  // Update panel if open
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
 }
 
 function saveNotes(idx) {
@@ -3250,7 +3348,8 @@ function exportCsv() {
     ['confidence',                'confidence'],
     ['confidence_reasons',        'confidence_reasons'],
     ['extraction_date',           'extraction_date'],
-    ['user_checked',              'user_checked'],
+    ['verified_by',               'verified_by'],
+    ['verified_at',               'verified_at'],
     ['user_notes',                'user_notes'],
   ];
   function csvCell(v) {
