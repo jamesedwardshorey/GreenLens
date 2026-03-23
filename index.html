@@ -127,6 +127,25 @@ tr:hover td{background:rgba(255,255,255,.015);}
     </div>
   </div>
 </div>
+
+<!-- ── Project picker overlay ─────────────────────────────────────────────── -->
+<div id="projectOverlay" style="display:none;position:fixed;inset:0;z-index:9998;background:var(--bg1);align-items:flex-start;justify-content:center;padding-top:5vh;overflow-y:auto;">
+  <div style="width:100%;max-width:640px;padding:0 1rem 4rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.8rem;">
+      <div style="font-size:1.4rem;font-weight:700;color:var(--text1);">🌿 GreenLens</div>
+      <button class="btn" onclick="signOut()" style="font-size:.75rem;">Sign out</button>
+    </div>
+    <div style="font-size:1rem;font-weight:600;color:var(--text1);margin-bottom:1rem;">Your projects</div>
+    <div id="projectList" style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.5rem;"></div>
+    <div style="display:flex;gap:.6rem;align-items:center;">
+      <input id="newProjectName" placeholder="New project name…"
+        style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:.55rem .8rem;color:var(--text1);font-size:.9rem;outline:none;"
+        onkeydown="if(event.key==='Enter')createProject()">
+      <button class="btn primary" onclick="createProject()">+ Create</button>
+    </div>
+    <div id="projectMsg" style="font-size:.8rem;color:var(--red);margin-top:.5rem;min-height:1rem;"></div>
+  </div>
+</div>
 <div class="shell">
 <div class="topbar">
   <div class="logo">Green<span>Lens</span> <span style="font-size:.6rem;opacity:.4;font-weight:400;">v2</span></div>
@@ -135,6 +154,8 @@ tr:hover td{background:rgba(255,255,255,.015);}
   <button class="btn" onclick="exportCsv()">&#x2193; Export CSV</button>
   <button class="btn" onclick="clearAll()" id="btnClear" style="display:none">&#x1F5D1; Clear</button>
   <button class="btn" onclick="openSettings()" id="btnSettings" title="Settings" style="padding:6px 10px;">&#x2699;&#xFE0F;</button>
+  <span id="activeProjectName" style="font-size:.75rem;color:var(--text3);margin-right:4px;"></span>
+  <button class="btn" onclick="showProjectPicker()" title="Switch project" style="padding:6px 10px;font-size:.75rem;">&#x21C6; Projects</button>
   <button class="btn" onclick="signOut()" title="Sign out" style="padding:6px 10px;" id="btnSignOut">&#x23FB;</button>
 </div>
 <div class="cfg" style="display:none" id="cfgBar">
@@ -370,19 +391,21 @@ let db = {};  // persistent store keyed by company name
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const _supa = supabase.createClient('https://pfpyxhdjrkvfkwcczerq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmcHl4aGRqcmt2Zmt3Y2N6ZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTE2NTQsImV4cCI6MjA4OTg2NzY1NH0.qFluwn9mFN15yAGE3e0rj__stDTiq8Kdoj9ECiW7eQ4');
 let _supaUser = null;
+let _activeProject = null; // { id, name }
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
 async function initAuth() {
   const { data: { session } } = await _supa.auth.getSession();
   if (session?.user) {
     _supaUser = session.user;
     document.getElementById('loginOverlay').style.display = 'none';
-    await loadResultsFromDb();
+    await showProjectPicker();
   }
   _supa.auth.onAuthStateChange(async (_event, session) => {
     _supaUser = session?.user || null;
     if (_supaUser) {
       document.getElementById('loginOverlay').style.display = 'none';
-      await loadResultsFromDb();
+      await showProjectPicker();
     }
   });
 }
@@ -406,21 +429,98 @@ async function doSignup() {
   msg.textContent = 'Creating account…';
   const { error } = await _supa.auth.signUp({ email, password: pass });
   if (error) { msg.style.color='var(--red)'; msg.textContent = error.message; }
-  else { msg.style.color = 'var(--green)'; msg.textContent = 'Check your email to confirm, then sign in'; }
+  else { msg.style.color = 'var(--green)'; msg.textContent = 'Account created — sign in below'; }
 }
 
 async function signOut() {
   await _supa.auth.signOut();
   _supaUser = null;
+  _activeProject = null;
   allResults = [];
-  applyFilters();
+  hideAppUI();
+  document.getElementById('projectOverlay').style.display = 'none';
   document.getElementById('loginOverlay').style.display = 'flex';
   toast('Signed out');
 }
 
-async function saveResultToDb(r) {
+function hideAppUI() {
+  document.getElementById('statsBar').style.display      = 'none';
+  document.getElementById('toolbar').style.display       = 'none';
+  document.getElementById('btnRun').style.display        = 'none';
+  document.getElementById('btnClear').style.display      = 'none';
+  document.getElementById('cfgBar').style.display        = 'none';
+  document.getElementById('uploadSection').style.display = 'block';
+  const tbody = document.getElementById('tBody');
+  if (tbody) tbody.innerHTML = '';
+}
+
+// ── Project picker ────────────────────────────────────────────────────────────
+async function showProjectPicker() {
   if (!_supaUser) return;
+  hideAppUI();
+  document.getElementById('projectOverlay').style.display = 'flex';
+  document.getElementById('projectMsg').textContent = '';
+  await renderProjectList();
+}
+
+async function renderProjectList() {
+  const list = document.getElementById('projectList');
+  list.innerHTML = '<div style="color:var(--text3);font-size:.8rem;">Loading…</div>';
+  const { data, error } = await _supa.from('projects').select('*').order('created_at', { ascending: false });
+  if (error) { list.innerHTML = '<div style="color:var(--red);font-size:.8rem;">Failed to load projects</div>'; return; }
+  if (!data?.length) {
+    list.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:.5rem 0;">No projects yet — create one below</div>';
+    return;
+  }
+  list.innerHTML = data.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.7rem 1rem;cursor:pointer;transition:border-color .15s;"
+         onmouseover="this.style.borderColor='var(--sky)'" onmouseout="this.style.borderColor='var(--border2)'"
+         onclick="openProject('${p.id}','${p.name.replace(/'/g,"\\'")}')">
+      <div>
+        <div style="font-weight:600;color:var(--text1);font-size:.9rem;">${p.name}</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Created ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <span style="font-size:.75rem;color:var(--sky);">Open →</span>
+        <button onclick="event.stopPropagation();deleteProject('${p.id}','${p.name.replace(/'/g,"\\'")}',this)"
+          style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 6px;border-radius:4px;"
+          onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+async function createProject() {
+  const name = document.getElementById('newProjectName').value.trim();
+  const msg  = document.getElementById('projectMsg');
+  if (!name) { msg.style.color='var(--red)'; msg.textContent = 'Enter a project name'; return; }
+  msg.textContent = '';
+  const { data, error } = await _supa.from('projects').insert({ name, created_by: _supaUser.id }).select().single();
+  if (error) { msg.style.color='var(--red)'; msg.textContent = error.message; return; }
+  document.getElementById('newProjectName').value = '';
+  await openProject(data.id, data.name);
+}
+
+async function deleteProject(id, name, btn) {
+  if (!confirm(`Delete project "${name}" and all its results? This cannot be undone.`)) return;
+  btn.textContent = '…';
+  await _supa.from('projects').delete().eq('id', id);
+  await renderProjectList();
+  toast(`Deleted: ${name}`);
+}
+
+async function openProject(id, name) {
+  _activeProject = { id, name };
+  document.getElementById('projectOverlay').style.display = 'none';
+  const label = document.getElementById('activeProjectName');
+  if (label) label.textContent = name;
+  await loadResultsFromDb();
+}
+
+// ── DB save / load ────────────────────────────────────────────────────────────
+async function saveResultToDb(r) {
+  if (!_supaUser || !_activeProject) return;
   await _supa.from('greenlens_results').upsert({
+    project_id: _activeProject.id,
     user_id: _supaUser.id,
     company: r.company,
     website: r.website || null,
@@ -448,29 +548,31 @@ async function saveResultToDb(r) {
     confidence_reasons: r.confidence_reasons || null,
     extraction_date: r.extraction_date || null,
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id,company' });
+  }, { onConflict: 'project_id,company' });
 }
 
 async function loadResultsFromDb() {
-  if (!_supaUser) return;
+  if (!_supaUser || !_activeProject) return;
   const { data, error } = await _supa
     .from('greenlens_results')
     .select('*')
-    .eq('user_id', _supaUser.id)
+    .eq('project_id', _activeProject.id)
     .order('updated_at', { ascending: false });
-  if (error || !data?.length) return;
-  allResults = data.map((r, i) => {
-    const mapped = { ...r, _idx: i };
-    if (Array.isArray(mapped.confidence_reasons)) {/* already parsed */}
-    else if (mapped.confidence_reasons) {
-      try { mapped.confidence_reasons = JSON.parse(mapped.confidence_reasons); } catch {}
-    }
-    mapped.maturity_score = mapped.maturity_score ? Number(mapped.maturity_score) : calcMaturity(mapped);
-    _rByIdx[i] = mapped;
-    dbMerge(mapped);
-    return mapped;
-  });
-  document.getElementById('uploadSection').style.display = 'none';
+  allResults = [];
+  Object.keys(_rByIdx).forEach(k => delete _rByIdx[k]);
+  if (!error && data?.length) {
+    allResults = data.map((r, i) => {
+      const mapped = { ...r, _idx: i };
+      if (!Array.isArray(mapped.confidence_reasons) && mapped.confidence_reasons) {
+        try { mapped.confidence_reasons = JSON.parse(mapped.confidence_reasons); } catch {}
+      }
+      mapped.maturity_score = mapped.maturity_score ? Number(mapped.maturity_score) : calcMaturity(mapped);
+      _rByIdx[i] = mapped;
+      dbMerge(mapped);
+      return mapped;
+    });
+  }
+  document.getElementById('uploadSection').style.display = allResults.length ? 'none' : 'block';
   document.getElementById('statsBar').style.display     = 'flex';
   document.getElementById('toolbar').style.display      = 'flex';
   document.getElementById('btnRun').style.display       = 'inline-block';
@@ -479,7 +581,8 @@ async function loadResultsFromDb() {
   setView('table');
   applyFilters();
   updateStats(allResults);
-  toast(`Loaded ${allResults.length} saved results`);
+  if (data?.length) toast(`Loaded ${data.length} results — ${_activeProject.name}`);
+  else toast(`${_activeProject.name} — ready for companies`);
 }
 
 let aiConfig = { enabled: true, model: 'google/gemini-2.0-flash-001' };
