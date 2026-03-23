@@ -1,0 +1,3157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GreenLens v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg1:#0a0e14;--bg2:#111620;--bg3:#181e2a;--bg4:#1e2535;--border1:rgba(255,255,255,.06);--border2:rgba(255,255,255,.10);--text1:#f0f4ff;--text2:#a8b4cc;--text3:#5a6680;--green:#4ade80;--amber:#fbbf24;--red:#f87171;--sky:#38bdf8;--lime:#bef264;--violet:#a78bfa;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg1);color:var(--text1);font-family:var(--sans);font-size:14px;min-height:100vh;}
+a{color:inherit;}
+.shell{display:flex;flex-direction:column;min-height:100vh;}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border1);padding:.6rem 1.2rem;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;}
+.logo{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--green);letter-spacing:-.02em;white-space:nowrap;}
+.logo span{color:var(--lime);}
+.tb-spacer{flex:1;}
+.cfg{background:var(--bg2);border-bottom:1px solid var(--border1);padding:.6rem 1.2rem;display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;}
+.cfg label{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+.cfg input,.cfg select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-family:var(--mono);font-size:.78rem;padding:5px 9px;outline:none;}
+.cfg input:focus,.cfg select:focus{border-color:var(--sky);}
+.upload-zone{border:2px dashed var(--border2);border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;transition:.2s;margin:1.5rem;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--green);background:rgba(74,222,128,.03);}
+.upload-zone h2{font-size:1rem;color:var(--text2);font-weight:500;margin-bottom:.4rem;}
+.upload-zone p{font-size:.75rem;color:var(--text3);}
+.stats-bar{display:flex;gap:1rem;padding:.55rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border1);flex-wrap:wrap;}
+.stat{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.stat-n{font-family:var(--mono);font-size:1.05rem;font-weight:700;}
+.stat-l{font-size:.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+.prog-wrap{padding:.5rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border1);display:none;}
+.prog-title{font-size:.72rem;color:var(--text2);margin-bottom:.3rem;display:flex;justify-content:space-between;}
+.prog-bar-bg{background:var(--bg4);border-radius:99px;height:5px;overflow:hidden;}
+.prog-bar-fill{background:linear-gradient(90deg,var(--green),var(--lime));height:100%;transition:width .3s;border-radius:99px;width:0%;}
+.toolbar{padding:.5rem 1.2rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border1);}
+.btn{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:.75rem;padding:5px 12px;cursor:pointer;transition:.15s;font-family:var(--sans);}
+.btn:hover{background:var(--bg4);color:var(--text1);}
+.btn.primary{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.25);color:var(--green);}
+.btn.primary:hover{background:rgba(74,222,128,.2);}
+.btn.danger{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.2);color:var(--red);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.sep{width:1px;height:18px;background:var(--border2);}
+select.filter-sel{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:.75rem;padding:5px 9px;outline:none;cursor:pointer;}
+.tbl-wrap{overflow-x:auto;flex:1;}
+table{width:100%;border-collapse:collapse;font-size:.78rem;}
+thead{position:sticky;top:0;z-index:10;}
+th{background:var(--bg2);border-bottom:1px solid var(--border2);padding:8px 10px;text-align:left;font-size:.64rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+td{border-bottom:1px solid var(--border1);padding:7px 10px;vertical-align:top;max-width:220px;}
+tr:hover td{background:rgba(255,255,255,.015);}
+.td-co{font-weight:500;color:var(--text1);font-size:.8rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.td-sub{font-family:var(--mono);font-size:.64rem;color:var(--sky);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px;}
+.td-mono{font-family:var(--mono);font-size:.75rem;}
+.td-na{color:var(--text3);}
+.td-link{color:var(--amber);text-decoration:none;font-size:.68rem;}
+.td-link:hover{text-decoration:underline;}
+.td-summary{font-size:.72rem;color:var(--text2);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:240px;cursor:help;}
+.rerun-wrap{display:flex;gap:3px;margin-top:3px;align-items:center;}
+.rerun-input{background:var(--bg4);border:1px solid var(--border2);border-radius:4px;color:var(--text1);font-family:var(--mono);font-size:.7rem;padding:3px 7px;outline:none;width:130px;}
+.rerun-input:focus{border-color:var(--sky);}
+.rerun-btn{background:var(--bg4);border:1px solid var(--border2);border-radius:4px;color:var(--text2);font-size:.72rem;padding:3px 8px;cursor:pointer;white-space:nowrap;}
+.rerun-btn:hover{background:var(--bg3);color:var(--text1);}
+.rerun-btn:disabled{opacity:.4;cursor:not-allowed;}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:.63rem;font-weight:500;white-space:nowrap;}
+.b-ok{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.2);}
+.b-warn{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2);}
+.b-err{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2);}
+.b-dim{background:rgba(255,255,255,.04);color:var(--text3);border:1px solid var(--border2);}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:.85rem;}
+.card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:1rem;cursor:pointer;transition:.15s;}
+.card:hover{border-color:var(--sky);transform:translateY(-1px);}
+.card-name{font-weight:600;font-size:.85rem;margin-bottom:.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.card-meta{display:flex;gap:.5rem;font-size:.7rem;color:var(--text2);flex-wrap:wrap;margin-bottom:.3rem;}
+.card-mat{display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border1);}
+.card-mat-l{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+.card-mat-v{font-family:var(--mono);font-size:.85rem;font-weight:600;}
+.th-sort{cursor:pointer;user-select:none;}
+.th-sort:hover{color:var(--text1);}
+.sort-arrow{display:inline-block;opacity:.25;color:var(--green);font-size:.65rem;margin-left:2px;}
+.sort-arrow.asc::after{content:'\25B2';}
+.sort-arrow.desc::after{content:'\25BC';}
+.sort-arrow.asc,.sort-arrow.desc{opacity:1;}
+.overlay{position:fixed;inset:0;z-index:100;display:flex;pointer-events:none;opacity:0;transition:opacity .2s;}
+.overlay.open{pointer-events:all;opacity:1;}
+.overlay-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);}
+.panel{position:absolute;right:0;top:0;bottom:0;width:min(540px,96vw);background:var(--bg2);border-left:1px solid var(--border2);overflow-y:auto;padding:1.5rem;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.overlay.open .panel{transform:translateX(0);}
+.pf{padding:.55rem 0;border-bottom:1px solid var(--border1);}
+.pf.full{grid-column:1/-1;}
+.pf-label{font-size:.61rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;}
+.pf-value{font-size:.81rem;color:var(--text2);line-height:1.5;}
+#pGrid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.log-wrap{background:var(--bg2);border-bottom:1px solid var(--border1);font-family:var(--mono);font-size:.67rem;}
+.log-header{display:flex;align-items:center;gap:.6rem;padding:.4rem 1rem;cursor:pointer;user-select:none;border-bottom:1px solid var(--border1);}
+.log-header:hover{background:rgba(255,255,255,.02);}
+.log-title{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;flex:1;}
+.log-toggle{font-size:.6rem;color:var(--text3);transition:transform .2s;}
+.log-toggle.collapsed{transform:rotate(-90deg);}
+.log-body{max-height:180px;overflow-y:auto;padding:.5rem 1rem;}
+.log-body.collapsed{display:none;}
+.log-g{color:var(--green);}
+.log-a{color:var(--amber);}
+.log-r{color:var(--red);}
+.log-b{color:var(--text3);}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.6rem 1.2rem;font-size:.78rem;color:var(--text1);z-index:9999;transition:transform .25s,opacity .25s;opacity:0;pointer-events:none;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.fade-in{animation:fi .2s ease;}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<!-- ── Login overlay ─────────────────────────────────────────────────────── -->
+<div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg1);align-items:center;justify-content:center;">
+  <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:2.5rem 2rem;width:100%;max-width:380px;display:flex;flex-direction:column;gap:1.2rem;">
+    <div style="font-size:1.4rem;font-weight:700;color:var(--text1);">🌿 GreenLens</div>
+    <div style="font-size:.85rem;color:var(--text2);">Sign in to your account</div>
+    <input id="loginEmail" type="email" placeholder="Email address"
+      style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:.6rem .8rem;color:var(--text1);font-size:.9rem;outline:none;"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <input id="loginPassword" type="password" placeholder="Password"
+      style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:.6rem .8rem;color:var(--text1);font-size:.9rem;outline:none;"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="loginMsg" style="font-size:.8rem;color:var(--red);min-height:1rem;"></div>
+    <button class="btn primary" onclick="doLogin()" style="width:100%;justify-content:center;">Sign in</button>
+    <div style="text-align:center;font-size:.78rem;color:var(--text3);">
+      No account? <a href="#" onclick="doSignup()" style="color:var(--sky);text-decoration:none;">Create one</a>
+    </div>
+  </div>
+</div>
+<div class="shell">
+<div class="topbar">
+  <div class="logo">Green<span>Lens</span> <span style="font-size:.6rem;opacity:.4;font-weight:400;">v2</span></div>
+  <div class="tb-spacer"></div>
+  <div id="aiPill" style="display:none;font-size:.65rem;padding:3px 8px;border-radius:10px;background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.25);white-space:nowrap;">&#x1F9E0; AI on</div>
+  <button class="btn" onclick="exportCsv()">&#x2193; Export CSV</button>
+  <button class="btn" onclick="clearAll()" id="btnClear" style="display:none">&#x1F5D1; Clear</button>
+  <button class="btn" onclick="openSettings()" id="btnSettings" title="Settings" style="padding:6px 10px;">&#x2699;&#xFE0F;</button>
+  <button class="btn" onclick="signOut()" title="Sign out" style="padding:6px 10px;" id="btnSignOut">&#x23FB;</button>
+</div>
+<div class="cfg" style="display:none" id="cfgBar">
+  <label>Workers</label>
+  <select id="workers"><option>1</option><option selected>3</option><option>5</option><option>8</option></select>
+  <label>Delay (s)</label>
+  <select id="delay"><option value="0.5">0.5</option><option value="1" selected>1</option><option value="1.5">1.5</option><option value="2">2</option></select>
+</div>
+<div id="uploadSection">
+  <!-- Input mode tabs -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--border2);margin:1.5rem 1.5rem 0;">
+    <button id="tabFile" onclick="switchInputTab('file')"
+      style="background:none;border:none;border-bottom:2px solid var(--green);color:var(--text1);font-size:.78rem;padding:.5rem 1.1rem;cursor:pointer;font-family:var(--sans);font-weight:500;margin-bottom:-1px;">
+      &#x1F4C2; Upload file
+    </button>
+    <button id="tabManual" onclick="switchInputTab('manual')"
+      style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-size:.78rem;padding:.5rem 1.1rem;cursor:pointer;font-family:var(--sans);font-weight:500;margin-bottom:-1px;">
+      &#x270F; Enter manually
+    </button>
+  </div>
+
+  <!-- File upload panel -->
+  <div id="panelFile" style="padding:1.5rem;">
+    <div class="upload-zone" id="dropzone" onclick="document.getElementById('fileIn').click()">
+      <h2>&#x1F4C2; Drop CSV / Excel or click to upload</h2>
+      <p>Needs a <strong>Company Name</strong> column &mdash; optional: Website, Sustainability URL</p>
+      <input type="file" id="fileIn" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+    </div>
+    <div style="text-align:center;padding-top:.5rem;">
+      <button class="btn primary" onclick="loadDemo()">&#x25B6; Load demo data</button>
+    </div>
+  </div>
+
+  <!-- Manual entry panel -->
+  <div id="panelManual" style="display:none;padding:1.5rem;">
+    <div style="max-width:560px;margin:0 auto;">
+      <p style="font-size:.78rem;color:var(--text3);margin-bottom:.75rem;">
+        One company per line. Optionally add a website after a comma or tab.<br>
+        <span style="color:var(--text3);opacity:.7;">e.g. &nbsp;<code style="font-family:var(--mono);font-size:.72rem;background:var(--bg3);padding:1px 5px;border-radius:3px;">Unilever</code> &nbsp;or&nbsp; <code style="font-family:var(--mono);font-size:.72rem;background:var(--bg3);padding:1px 5px;border-radius:3px;">BT Group, bt.com</code></span>
+      </p>
+      <textarea id="manualInput" placeholder="Unilever&#10;BT Group, bt.com&#10;Tesco&#10;HSBC&#10;Rolls-Royce Holdings"
+        style="width:100%;height:220px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-family:var(--mono);font-size:.8rem;padding:.75rem 1rem;outline:none;resize:vertical;line-height:1.6;"
+        onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();loadManualInput()}"
+        onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+      <div style="display:flex;gap:.6rem;margin-top:.75rem;align-items:center;">
+        <button class="btn primary" onclick="loadManualInput()" style="font-size:.8rem;padding:7px 18px;">
+          &#x25B6; Load companies
+        </button>
+        <span style="font-size:.72rem;color:var(--text3);" id="manualCount"></span>
+        <span style="font-size:.68rem;color:var(--text3);margin-left:auto;">Cmd/Ctrl+Enter to load</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="stats-bar" id="statsBar" style="display:none">
+  <div class="stat"><div class="stat-n" id="sTotal" style="color:var(--sky)">0</div><div class="stat-l">Total</div></div>
+  <div class="stat"><div class="stat-n" id="sOK" style="color:var(--green)">0</div><div class="stat-l">Success</div></div>
+  <div class="stat"><div class="stat-n" id="sNZ" style="color:var(--lime)">0</div><div class="stat-l">Net Zero</div></div>
+  <div class="stat"><div class="stat-n" id="sSBTi" style="color:var(--violet)">0</div><div class="stat-l">SBTi</div></div>
+  <div class="stat"><div class="stat-n" id="sAvgMat" style="color:var(--amber)">&#x2014;</div><div class="stat-l">Avg Maturity</div></div>
+  <div style="flex:1"></div>
+  <button class="btn primary" id="btnRun" onclick="startRun()" style="display:none">&#x25B6; Run Analysis</button>
+  <button class="btn danger" id="btnCancel" onclick="cancelRun()" style="display:none">&#x2715; Cancel</button>
+</div>
+<div class="prog-wrap" id="progWrap">
+  <div class="prog-title"><span id="progTitle">Running&hellip;</span><span id="progEta"></span></div>
+  <div class="prog-bar-bg"><div class="prog-bar-fill" id="progFill"></div></div>
+</div>
+<div class="log-wrap" id="logWrap" style="display:none">
+  <div class="log-header" onclick="toggleLog()">
+    <span class="log-title">&#x1F4CB; Processing log</span>
+    <button class="btn" style="padding:2px 9px;font-size:.63rem;" onclick="event.stopPropagation();copyLog()" id="btnCopyLog">&#x2398; Copy log</button>
+    <span class="log-toggle" id="logToggleArrow">&#x25BC;</span>
+  </div>
+  <div class="log-body" id="logLines"></div>
+</div>
+<div class="toolbar" id="toolbar" style="display:none">
+  <button class="btn" onclick="setView('table')" id="vTable">&#x229E; Table</button>
+  <button class="btn" onclick="setView('cards')" id="vCards">&#x229F; Cards</button>
+  <div class="sep"></div>
+  <select class="filter-sel" id="fStatus" onchange="applyFilters()">
+    <option value="">All statuses</option>
+    <option value="Success">Success</option>
+    <option value="Sustainability page not found">No Sus Page</option>
+    <option value="Website not found">No Website</option>
+  </select>
+  <select class="filter-sel" id="fNZ" onchange="applyFilters()">
+    <option value="">All net zero</option>
+    <option value="has_nz">Has target</option>
+    <option value="no_nz">No target</option>
+  </select>
+  <select class="filter-sel" id="fConf" onchange="applyFilters()">
+    <option value="">All confidence</option>
+    <option value="High">High</option>
+    <option value="Medium">Medium</option>
+    <option value="Low">Low</option>
+  </select>
+  <select class="filter-sel" id="fDoc" onchange="applyFilters()">
+    <option value="">All documents</option>
+    <option value="has_doc">Has document</option>
+    <option value="no_doc">No document</option>
+  </select>
+  <input type="text" id="fSearch" placeholder="&#x1F50D; Search&hellip;" oninput="applyFilters()"
+    style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.75rem;padding:5px 10px;outline:none;width:160px;">
+  <span style="font-size:.72rem;color:var(--text3);" id="pageInfo"></span>
+</div>
+<div class="tbl-wrap" id="tableView" style="display:none">
+  <table>
+    <thead><tr>
+      <th onclick="colSortBy('name')" class="th-sort">Company <span class="sort-arrow" id="sa-name"></span></th>
+      <th onclick="colSortBy('status')" class="th-sort">Status <span class="sort-arrow" id="sa-status"></span></th>
+      <th onclick="colSortBy('suspage')" class="th-sort">Sustainability Page <span class="sort-arrow" id="sa-suspage"></span></th>
+      <th onclick="colSortBy('nz')" class="th-sort">Net Zero <span class="sort-arrow" id="sa-nz"></span></th>
+      <th onclick="colSortBy('summary')" class="th-sort">Summary <span class="sort-arrow" id="sa-summary"></span></th>
+      <th onclick="colSortBy('certs')" class="th-sort">Certifications <span class="sort-arrow" id="sa-certs"></span></th>
+      <th onclick="colSortBy('maturity')" class="th-sort">Maturity <span class="sort-arrow" id="sa-maturity"></span></th>
+      <th onclick="colSortBy('reason')" class="th-sort">Maturity Reason <span class="sort-arrow" id="sa-reason"></span></th>
+      <th onclick="colSortBy('date')" class="th-sort">Last Run <span class="sort-arrow" id="sa-date"></span></th>
+      <th onclick="colSortBy('doc')" class="th-sort">Sustainability Document <span class="sort-arrow" id="sa-doc"></span></th>
+      <th onclick="colSortBy('confidence')" class="th-sort">Confidence <span class="sort-arrow" id="sa-confidence"></span></th>
+    </tr></thead>
+    <tbody id="tBody"></tbody>
+  </table>
+</div>
+<div id="cardsView" style="display:none;padding:1rem;">
+  <div class="card-grid" id="cardGrid"></div>
+</div>
+<div class="overlay" id="overlay">
+  <div class="overlay-bg" onclick="closePanel()"></div>
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem;">
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;color:var(--text1);" id="pName"></div>
+        <div id="pWebsite" style="font-size:.78rem;margin-top:.35rem;"></div>
+      </div>
+      <button onclick="closePanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;line-height:1;padding:.2rem;">&#x2715;</button>
+    </div>
+    <div class="pf-label">Sustainability Page</div>
+    <div id="pUrl" style="font-size:.82rem;margin-bottom:.6rem;word-break:break-all;"></div>
+    <div id="pRerun" style="margin-bottom:1rem;display:none;"></div>
+    <div id="pGrid"></div>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- AI Key Warning Modal -->
+
+    <div style="display:flex;gap:.6rem;justify-content:center;">
+      <button class="btn" onclick="document.getElementById('aiWarningOverlay').style.display='none'">Cancel</button>
+      <button class="btn primary" onclick="document.getElementById('aiWarningOverlay').style.display='none';openSettings();">
+        ⚙️ Open Settings
+      </button>
+    </div>
+  </div>
+</div>
+<div id="settingsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:1.5rem;width:480px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+      <div style="font-size:1rem;font-weight:700;color:var(--text1);">&#x2699;&#xFE0F; Settings</div>
+      <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;padding:.2rem;">&#x2715;</button>
+    </div>
+
+    <!-- AI Section -->
+    <div style="border:1px solid var(--border2);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+      <div style="font-size:.78rem;font-weight:600;color:var(--green);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em;">&#x1F9E0; AI Enhancement (OpenRouter)</div>
+      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.8rem;line-height:1.5;">
+        Enables AI-powered website finding, sustainability page detection, and data extraction. 
+        Get a free key at <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--sky);">openrouter.ai/keys</a>.
+      </div>
+      <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:.3rem;">API Key</label>
+      <div style="display:flex;gap:.5rem;margin-bottom:.75rem;">
+        <input id="settingsApiKey" type="password" placeholder="sk-or-v1-..." 
+          style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-family:var(--mono);font-size:.72rem;padding:7px 10px;outline:none;"
+          onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
+          onkeydown="if(event.key==='Enter')saveSettings()" oninput="updateAiStatus()">
+        <button class="btn" onclick="toggleKeyVisibility()" id="btnShowKey" style="font-size:.7rem;padding:6px 10px;">Show</button>
+        <button class="btn" onclick="clearSavedKey()" title="Remove saved key" style="font-size:.7rem;padding:6px 10px;color:var(--red);">✕</button>
+      </div>
+      <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:.3rem;">Model</label>
+      <select id="settingsModel" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.72rem;padding:7px 10px;outline:none;">
+        <option value="google/gemini-flash-1.5">google/gemini-flash-1.5 (fast, cheap)</option>
+        <option value="google/gemini-2.0-flash-001">google/gemini-2.0-flash-001 (recommended)</option>
+        <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (good balance)</option>
+        <option value="openai/gpt-4o">openai/gpt-4o (highest quality)</option>
+        <option value="anthropic/claude-3-haiku">anthropic/claude-3-haiku</option>
+        <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
+        <option value="meta-llama/llama-3.1-8b-instruct:free">meta-llama/llama-3.1-8b (free tier)</option>
+      </select>
+      <div style="margin-top:.75rem;">
+        <label style="font-size:.72rem;color:var(--text2);display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+          <input type="checkbox" id="settingsAiEnabled" style="accent-color:var(--green);" onchange="updateAiStatus()">
+          <span>Enable AI enhancement</span>
+        </label>
+      </div>
+      <div id="aiStatusLine" style="font-size:.68rem;margin-top:.6rem;color:var(--text3);"></div>
+    </div>
+
+    <!-- Workers / Delay -->
+    <div style="border:1px solid var(--border2);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+      <div style="font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em;">&#x26A1; Processing</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+        <div>
+          <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:.3rem;">Concurrent workers</label>
+          <select id="settingsWorkers" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.72rem;padding:7px 10px;outline:none;">
+            <option>1</option><option selected>3</option><option>5</option><option>8</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:.3rem;">Delay between (s)</label>
+          <select id="settingsDelay" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.72rem;padding:7px 10px;outline:none;">
+            <option value="0.5">0.5</option><option value="1" selected>1</option><option value="1.5">1.5</option><option value="2">2</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+      <button class="btn" onclick="closeSettings()">Cancel</button>
+      <button class="btn primary" onclick="saveSettings()">&#x2713; Save</button>
+    </div>
+  </div>
+</div>
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let allResults = [], filteredResults = [], currentSort = { key: 'name', dir: 'asc' };
+let currentView = 'table';
+let isRunning = false, cancelFlag = false;
+let _rByIdx = {};
+let db = {};  // persistent store keyed by company name
+
+// ── AI config ──────────────────────────────────────────────────────────────
+// ── Supabase ─────────────────────────────────────────────────────────────────
+const _supa = supabase.createClient('https://pfpyxhdjrkvfkwcczerq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmcHl4aGRqcmt2Zmt3Y2N6ZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTE2NTQsImV4cCI6MjA4OTg2NzY1NH0.qFluwn9mFN15yAGE3e0rj__stDTiq8Kdoj9ECiW7eQ4');
+let _supaUser = null;
+
+async function initAuth() {
+  const { data: { session } } = await _supa.auth.getSession();
+  if (session?.user) {
+    _supaUser = session.user;
+    document.getElementById('loginOverlay').style.display = 'none';
+    await loadResultsFromDb();
+  }
+  _supa.auth.onAuthStateChange(async (_event, session) => {
+    _supaUser = session?.user || null;
+    if (_supaUser) {
+      document.getElementById('loginOverlay').style.display = 'none';
+      await loadResultsFromDb();
+    }
+  });
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  const msg   = document.getElementById('loginMsg');
+  msg.style.color = 'var(--text2)';
+  msg.textContent = 'Signing in…';
+  const { error } = await _supa.auth.signInWithPassword({ email, password: pass });
+  if (error) { msg.style.color='var(--red)'; msg.textContent = error.message; }
+}
+
+async function doSignup() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  const msg   = document.getElementById('loginMsg');
+  if (!email || !pass) { msg.style.color='var(--red)'; msg.textContent = 'Enter email and password first'; return; }
+  msg.style.color = 'var(--text2)';
+  msg.textContent = 'Creating account…';
+  const { error } = await _supa.auth.signUp({ email, password: pass });
+  if (error) { msg.style.color='var(--red)'; msg.textContent = error.message; }
+  else { msg.style.color = 'var(--green)'; msg.textContent = 'Check your email to confirm, then sign in'; }
+}
+
+async function signOut() {
+  await _supa.auth.signOut();
+  _supaUser = null;
+  allResults = [];
+  applyFilters();
+  document.getElementById('loginOverlay').style.display = 'flex';
+  toast('Signed out');
+}
+
+async function saveResultToDb(r) {
+  if (!_supaUser) return;
+  await _supa.from('greenlens_results').upsert({
+    user_id: _supaUser.id,
+    company: r.company,
+    website: r.website || null,
+    status: r.status || null,
+    sustainability_url: r.sustainability_url || null,
+    sustainability_summary: r.sustainability_summary || null,
+    net_zero_target_year: r.net_zero_target_year || null,
+    net_zero_source: r.net_zero_source || null,
+    net_zero_source_url: r.net_zero_source_url || null,
+    emissions_reduction_target: r.emissions_reduction_target || null,
+    carbon_data: r.carbon_data || null,
+    certifications: r.certifications || null,
+    key_initiatives: r.key_initiatives || null,
+    transition_plan_url: r.transition_plan_url || null,
+    transition_plan_title: r.transition_plan_title || null,
+    doc_confidence: r.doc_confidence || null,
+    sbti_near_term_status: r.sbti_near_term_status || null,
+    sbti_net_zero_status: r.sbti_net_zero_status || null,
+    sbti_temperature: r.sbti_temperature || null,
+    cdp_score: r.cdp_score || null,
+    sme_hub_member: r.sme_hub_member || false,
+    sme_hub_url: r.sme_hub_url || null,
+    maturity_score: r.maturity_score || null,
+    confidence: r.confidence || null,
+    confidence_reasons: r.confidence_reasons || null,
+    extraction_date: r.extraction_date || null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id,company' });
+}
+
+async function loadResultsFromDb() {
+  if (!_supaUser) return;
+  const { data, error } = await _supa
+    .from('greenlens_results')
+    .select('*')
+    .eq('user_id', _supaUser.id)
+    .order('updated_at', { ascending: false });
+  if (error || !data?.length) return;
+  allResults = data.map((r, i) => {
+    const mapped = { ...r, _idx: i };
+    if (Array.isArray(mapped.confidence_reasons)) {/* already parsed */}
+    else if (mapped.confidence_reasons) {
+      try { mapped.confidence_reasons = JSON.parse(mapped.confidence_reasons); } catch {}
+    }
+    mapped.maturity_score = mapped.maturity_score ? Number(mapped.maturity_score) : calcMaturity(mapped);
+    _rByIdx[i] = mapped;
+    dbMerge(mapped);
+    return mapped;
+  });
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('statsBar').style.display     = 'flex';
+  document.getElementById('toolbar').style.display      = 'flex';
+  document.getElementById('btnRun').style.display       = 'inline-block';
+  document.getElementById('btnClear').style.display     = 'inline-block';
+  document.getElementById('cfgBar').style.display       = 'flex';
+  setView('table');
+  applyFilters();
+  updateStats(allResults);
+  toast(`Loaded ${allResults.length} saved results`);
+}
+
+let aiConfig = { enabled: true, model: 'google/gemini-2.0-flash-001' };
+function aiEnabled() { return true; }
+
+// ── Settings panel ─────────────────────────────────────────────────────────
+function clearSavedKey() {
+  localStorage.removeItem('greenlens_api_key');
+  localStorage.removeItem('greenlens_model');
+  aiConfig = { enabled: false, apiKey: '', model: 'google/gemini-2.0-flash-001' };
+  document.getElementById('settingsApiKey').value = '';
+  document.getElementById('settingsAiEnabled').checked = false;
+  const pill = document.getElementById('aiPill');
+  if (pill) pill.style.display = 'none';
+  updateAiStatus();
+  toast('API key cleared');
+}
+function showAiWarning() {
+  const ov = document.getElementById('aiWarningOverlay');
+  ov.style.display = 'flex';
+}
+function openSettings() {
+  // Load persisted key from localStorage
+  const savedKey   = localStorage.getItem('greenlens_api_key')   || '';
+  const savedModel = localStorage.getItem('greenlens_model')     || 'google/gemini-2.0-flash-001';
+  if (!aiConfig.apiKey && savedKey) {
+    aiConfig.apiKey  = savedKey;
+    aiConfig.model   = savedModel;
+    aiConfig.enabled = true;
+  }
+  document.getElementById('settingsApiKey').value  = aiConfig.apiKey || savedKey;
+  document.getElementById('settingsModel').value   = aiConfig.model  || savedModel;
+  document.getElementById('settingsAiEnabled').checked = aiEnabled();
+  document.getElementById('settingsWorkers').value = document.getElementById('workers')?.value || '3';
+  document.getElementById('settingsDelay').value   = document.getElementById('delay')?.value   || '1';
+  updateAiStatus();
+  const ov = document.getElementById('settingsOverlay');
+  ov.style.display = 'flex';
+}
+function closeSettings() {
+  document.getElementById('settingsOverlay').style.display = 'none';
+}
+function toggleKeyVisibility() {
+  const inp = document.getElementById('settingsApiKey');
+  const btn = document.getElementById('btnShowKey');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+function updateAiStatus() {
+  const key = document.getElementById('settingsApiKey').value.trim();
+  const on  = document.getElementById('settingsAiEnabled').checked;
+  const el  = document.getElementById('aiStatusLine');
+  if (!key)       el.innerHTML = '<span style="color:var(--amber)">⚠ Enter an API key to enable AI</span>';
+  else if (!on)   el.innerHTML = '<span style="color:var(--text3)">AI available but disabled</span>';
+  else            el.innerHTML = '<span style="color:var(--green)">✓ AI enhancement active</span>';
+}
+function saveSettings() {
+  const key   = document.getElementById('settingsApiKey').value.trim();
+  const model = document.getElementById('settingsModel').value;
+  const on    = document.getElementById('settingsAiEnabled').checked;
+  aiConfig = { enabled: !!key, apiKey: key, model };
+  if (!on && !key) aiConfig.enabled = false;
+  if (key) document.getElementById('settingsAiEnabled').checked = true;
+  // Persist to localStorage
+  if (key) {
+    localStorage.setItem('greenlens_api_key', key);
+    localStorage.setItem('greenlens_model', model);
+  } else {
+    localStorage.removeItem('greenlens_api_key');
+  }
+  // sync workers/delay
+  const w = document.getElementById('settingsWorkers');
+  const d = document.getElementById('settingsDelay');
+  if (w) document.getElementById('workers').value = w.value;
+  if (d) document.getElementById('delay').value   = d.value;
+  closeSettings();
+  const pill = document.getElementById('aiPill');
+  if (pill) pill.style.display = aiEnabled() ? 'block' : 'none';
+  toast(aiEnabled() ? '✓ AI enabled — ' + model.split('/')[1] : '✓ Settings saved (no AI key)');
+}
+
+// ── AI helper — proxied through Supabase Edge Function ───────────────────
+async function aiAsk(prompt, maxTokens=400) {
+  try {
+    const r = await fetch('https://pfpyxhdjrkvfkwcczerq.supabase.co/functions/v1/ai-proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmcHl4aGRqcmt2Zmt3Y2N6ZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTE2NTQsImV4cCI6MjA4OTg2NzY1NH0.qFluwn9mFN15yAGE3e0rj__stDTiq8Kdoj9ECiW7eQ4`,
+      },
+      body: JSON.stringify({
+        model: aiConfig.model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(25000),
+    });
+    if (!r.ok) {
+      log('a', `  AI proxy error: ${r.status}`);
+      return null;
+    }
+    const data = await r.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch(e) { log('a', `  AI failed: ${e.message}`); return null; }
+}
+
+// AI-powered website finder — asks AI for domain, then verifies it exists
+async function aiFindWebsite(companyName) {
+  const answer = await aiAsk(
+    `What is the official website domain for the UK company "${companyName}"? ` +
+    `Only answer if you are certain this is the real registered company website — not a similarly named business, ` +
+    `parked domain, or guessed URL. Prefer .co.uk for UK companies. ` +
+    `Reply with ONLY the bare domain (e.g. shlegal.com) and nothing else. ` +
+    `If you are not certain, reply with the single word: unknown`,
+    60
+  );
+  if (!answer || answer.toLowerCase().includes('unknown')) return null;
+  const domain = answer.trim().toLowerCase()
+    .replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/^www\./,'');
+  if (!domain || !domain.includes('.')) return null;
+  log('b', `  AI suggests domain: ${domain}`);
+  // Verify the domain actually responds
+  const ok = await quickCheckUrl(`https://${domain}`);
+  if (!ok) { log('a', `  AI domain ${domain} unreachable — rejecting`); return null; }
+  // Quick proxy check for parked/for-sale pages — if proxy is blocked, trust the domain
+  const html = await proxyFetch(`https://${domain}`, 5000);
+  if (html) {
+    const snippet = html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').toLowerCase().slice(0, 800);
+    if (/buy\s*this\s*domain|domain\s*(is\s*)?(for\s*sale|parked)|this\s*domain\s*has|hugedomains|sedo\.com|undeveloped\.com|godaddy\.com\/parking/i.test(snippet)) {
+      log('a', `  AI domain ${domain} appears to be a parked/for-sale page — rejecting`);
+      return null;
+    }
+  }
+  return domain;
+}
+
+// AI-powered sustainability page finder — fetches homepage HTML, asks AI for the sus URL
+// ── Sus page URL validation ─────────────────────────────────────────────────
+const SUS_PATH_BLOCK = /\.(pdf|docx?|xlsx?|pptx?)(\?|$)|\/news|\/press\b|\/blog\b|\/article|\/media\/|\/events?\/|\/jobs?\/|\/careers?\/|\/investor|\/legal\/|\/privacy|\/cookie|\/terms|\/product(?:s|[-_/])|\/category|\/service(?:s|[-_/])|\/solution(?:s|[-_/])|\/shop|\/store/i;
+
+function isSusPageUrl(url) {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.toLowerCase();
+    const host = u.hostname.toLowerCase();
+    // Block blog/news/login subdomains
+    if (/^(blog|news|press|media|stories|insights|login|webmail|mail|app|portal)\./i.test(host.replace('www.',''))) return false;
+    if (!path || path === '/' || path === '/index.html' || path === '/index.php') return false;
+    if (SUS_PATH_BLOCK.test(path)) return false;
+    // Must contain a sustainability keyword in the path
+    if (!/sustainab|esg|environment|carbon|net.?zero|climate|responsib|impact|csr|corporate.social|green(?!wich|land|wood|s)|bcorp|b-corp/i.test(path)) return false;
+    return true;
+  } catch { return false; }
+}
+
+// Scan a page, validate it's genuinely a sus page, and extract data in one AI call
+// Returns { url, is_valid, summary, net_zero_target_year, net_zero_source, emissions_reduction_target, key_initiatives }
+async function scanAndExtractSusPage(url, companyName) {
+  log('b', `  Scanning page: ${url}`);
+  const html = await proxyFetch(url, 15000);
+  if (!html) {
+    log('a', `  Proxy fetch failed for ${url} — cannot verify page, rejecting`);
+    return { url, is_valid: false, proxyFailed: true };
+  }
+
+  const text = html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Detect 404/error pages from body content — always reject these regardless of URL
+  const first500 = text.slice(0, 500).toLowerCase();
+  const is404Page = /\b(page not found|404|page doesn.t exist|this page no longer|oops.{0,20}something went wrong|error 404)\b/i.test(first500)
+    && !/net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]/i.test(text.slice(0, 2000));
+  if (is404Page) {
+    log('a', `  Page looks like a 404 — rejecting: ${url}`);
+    return { url, is_valid: false };
+  }
+
+  // Quick keyword check on body — reject if no sustainability substance
+  // Exception: if URL explicitly names a sustainability/ESG page, proxy may be serving a cookie wall
+  const urlPathForCheck = (() => { try { return new URL(url).pathname.toLowerCase(); } catch { return ''; } })();
+  const urlIsExplicitSus = /sustainab|esg|environment|carbon|net.?zero|climate|responsib|csr/i.test(urlPathForCheck);
+  if (!urlIsExplicitSus && !/net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]|ghg|greenhouse/i.test(text.slice(0, 5000))) {
+    log('a', `  Page body lacks sustainability content — likely a redirect or generic page`);
+    return { url, is_valid: false };
+  }
+  // If URL is sus-named but body lacks keywords — proxy may be returning a cookie wall; proceed with text fallback
+  const hasSusBody = /net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]|ghg|greenhouse/i.test(text.slice(0, 5000));
+
+  // Regex-based net zero year (always run — fast, no AI needed)
+  // Only accept explicit "net zero by YEAR" — not emissions reduction targets
+  const nzFromPage = (() => {
+    const patterns = [
+      /\bnet[\s-]?zero\b[^.!?]{0,80}by\s+(20\d{2})/gi,
+      /\bcarbon[\s-]?neutral(?:ity)?\b[^.!?]{0,60}by\s+(20\d{2})/gi,
+      /(?:achieve|reach|become|attain|commit[a-z]*)\s+(?:to\s+)?net[\s-]?zero[^.!?]{0,60}(20\d{2})/gi,
+      /net[\s-]?zero\s+(?:by\s+)?(20\d{2})/gi,
+    ];
+    const years = patterns.flatMap(p => [...text.matchAll(p)].map(m => parseInt(m[1]))).filter(y => y >= 2025 && y <= 2060);
+    return years.length > 0 ? String(Math.max(...years)) : null;
+  })();
+
+  // Text-based fallback summary — extract meaningful sentences mentioning key topics
+  function textFallback() {
+    const domain = (() => { try { return new URL(url).hostname.replace('www.',''); } catch { return 'sustainability page'; } })();
+    // Extract sentences that contain sustainability substance
+    const sentences = text
+      .replace(/([.!?])\s+/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 40 && s.length < 400)
+      .filter(s => /sustainab|carbon|net.?zero|emission|climate|renewable|scope|esg|environment|ghg|target|commit|reduc/i.test(s));
+    const summary = sentences.slice(0, 3).join(' ') || null;
+    // Extract short phrases that look like initiative names (title-case, 3–8 words)
+    const initiativeMatches = text.match(/\b[A-Z][a-zA-Z]+(?:\s+[A-Za-z]+){2,6}(?=\s*[.:\n])/g) || [];
+    const initiatives = [...new Set(
+      initiativeMatches
+        .filter(p => /sustainab|carbon|zero|climate|renew|emission|energy|environ/i.test(p))
+        .slice(0, 5)
+    )].join(', ') || null;
+    return { summary, initiatives, domain, nzYear: nzFromPage };
+  }
+
+  if (!aiEnabled()) {
+    const fb = textFallback();
+    return {
+      url, is_valid: true,
+      net_zero_target_year: fb.nzYear,
+      net_zero_source: fb.nzYear ? fb.domain : null,
+      sustainability_summary: fb.summary,
+      key_initiatives: fb.initiatives,
+    };
+  }
+
+  // Preserve table structure for scope data — convert cells to readable rows before stripping
+  const tableText = (() => {
+    let t = html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<tr[^>]*>/gi, '\n')
+      .replace(/<\/tr>/gi, '')
+      .replace(/<t[dh][^>]*>/gi, ' | ')
+      .replace(/<\/t[dh]>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n[ \t]+/g, '\n')
+      .trim();
+    return t;
+  })();
+
+  const answer = await aiAsk(
+    `You are reviewing a web page for "${companyName}".\n` +
+    `Does this page contain substantive sustainability or carbon data? ACCEPT: sustainability pages, ESG pages, carbon reduction plans, net zero plans, climate action pages, OR any page reporting actual emissions data. REJECT only: generic homepages, unrelated news/press, cookie/privacy/legal pages.\n` +
+    `Extract data and reply ONLY with JSON (null for any field not found):\n` +
+    `{"is_valid_sus_page":true/false,"rejection_reason":"<brief reason if false, else null>","net_zero_target_year":<4-digit year or null>,"net_zero_source":"<e.g. stated on sustainability page>","emissions_reduction_target":"<e.g. 50% Scope 1&2 reduction by 2030 vs 2018>","carbon_data":"<e.g. Scope 1: 12,345 tCO2e, Scope 2: 4,567 tCO2e, Scope 3: 89,012 tCO2e>","sustainability_summary":"<2-3 sentence summary>","certifications":"<comma-separated e.g. ISO 14001, B Corp, TCFD>","key_initiatives":"<comma-separated>"}\n\n` +
+    `For carbon_data: scan carefully for Scope 1/2/3 figures — they are often in tables (rows shown pipe-separated below). Format as "Scope 1: X tCO2e, Scope 2: Y tCO2e, Scope 3: Z tCO2e".\n` +
+    `For net_zero_target_year: only the year full net zero is reached across ALL scopes — not an interim target.\n\n` +
+    `Page content:\n${tableText.slice(0, 6000)}`,
+    700
+  );
+
+  const fb = textFallback();
+
+  if (!answer) return { url, is_valid: true, net_zero_target_year: fb.nzYear, net_zero_source: fb.nzYear ? fb.domain : null, sustainability_summary: fb.summary, key_initiatives: fb.initiatives };
+  try {
+    const parsed = JSON.parse(answer.replace(/```json|```/g, '').trim());
+    if (!parsed.is_valid_sus_page) {
+      log('a', `  AI rejected: ${parsed.rejection_reason || 'not a sustainability page'}`);
+      return { url, is_valid: false };
+    }
+    log('g', `  ✓ Valid sus page — NZ: ${parsed.net_zero_target_year || nzFromPage || 'not found'}`);
+    return {
+      url, is_valid: true,
+      net_zero_target_year: parsed.net_zero_target_year ? String(parsed.net_zero_target_year) : (nzFromPage || null),
+      net_zero_source: parsed.net_zero_source || (nzFromPage ? fb.domain : null),
+      emissions_reduction_target: parsed.emissions_reduction_target || null,
+      carbon_data: parsed.carbon_data || null,
+      sustainability_summary: parsed.sustainability_summary || fb.summary || null,
+      certifications: parsed.certifications || null,
+      key_initiatives: parsed.key_initiatives || fb.initiatives || null,
+    };
+  } catch { return { url, is_valid: true, net_zero_target_year: fb.nzYear, sustainability_summary: fb.summary, key_initiatives: fb.initiatives }; }
+}
+
+async function aiFindSusPage(website, companyName) {
+  const baseUrl = `https://${website}`;
+  log('b', `  AI scanning homepage for sus links...`);
+  const html = await proxyFetch(baseUrl, 12000);
+  if (!html) return null;
+
+  const links = new Set();
+  const re = /href=["']([^"'#]{5,200})["']/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1].split('?')[0];
+    const full = href.startsWith('http') ? href : `${baseUrl}${href.startsWith('/') ? '' : '/'}${href}`;
+    if (isSusPageUrl(full)) links.add(full);
+  }
+
+  if (links.size > 0) {
+    const list = [...links].slice(0, 20);
+    log('b', `  Found ${list.length} sus link candidates`);
+    const answer = await aiAsk(
+      `From these URLs on ${website}, pick the single BEST page about sustainability, ESG, environment, corporate responsibility, or net zero — even if the URL path uses generic words like /about/ or /company/.\n` +
+      `Prefer URLs containing words like: sustainability, esg, environment, carbon, climate, responsibility, csr, net-zero, green.\n` +
+      `If none are clearly relevant, reply "none".\nReply with ONLY the URL or "none":\n${list.join('\n')}`,
+      120
+    );
+    log('b', `  AI sus pick: ${answer}`);
+    if (answer && answer !== 'none' && answer.startsWith('http')) {
+      const pickedUrl = answer.trim();
+      // Only trust as fromHomepage if the URL is on the same domain we fetched
+      let onSameDomain = false;
+      try {
+        const pickedHost = new URL(pickedUrl).hostname.replace('www.','');
+        onSameDomain = pickedHost === website.replace('www.','') || pickedHost.endsWith('.' + website.replace('www.',''));
+      } catch {}
+      if (!onSameDomain) {
+        // Cross-domain link — do a quick HEAD to verify it's not a 404 before trusting
+        log('a', `  AI picked cross-domain URL ${pickedUrl} — verifying...`);
+        const ok = await quickCheckUrl(pickedUrl, 7000, true);
+        if (!ok) return null;
+      }
+      return { url: pickedUrl, fromHomepage: onSameDomain };
+    }
+  }
+
+  // Fallback: ask AI to construct/guess the URL from knowledge
+  const guessed = await aiAsk(
+    `What is the sustainability, ESG, environment, or corporate responsibility page URL for "${companyName}" on ${website}?\n` +
+    `Consider common paths like /sustainability, /esg, /environment, /corporate-responsibility, /about/sustainability, /csr.\n` +
+    `Reply with ONLY the full URL, or "unknown".`,
+    80
+  );
+  if (guessed && !guessed.toLowerCase().includes('unknown') && guessed.startsWith('http')) {
+    log('b', `  AI guessed sus URL: ${guessed.trim()}`);
+    const ok = await quickCheckUrl(guessed.trim(), 7000, true);
+    return ok ? { url: guessed.trim(), fromHomepage: false } : null;
+  }
+
+  // Final fallback: probe common paths — verify content not a soft 404
+  const commonPaths = [
+    '/sustainability', '/esg', '/environment', '/corporate-responsibility',
+    '/csr', '/about/sustainability', '/about/environment', '/about/esg',
+    '/company/sustainability', '/our-impact', '/net-zero', '/carbon',
+    '/responsibility', '/climate', '/impact', '/green',
+  ];
+  for (const p of commonPaths) {
+    const url = `${baseUrl}${p}`;
+    const found = await probePathWithContentCheck(url);
+    if (found) { log('g', `  Found via probe: ${url}`); return { url, fromHomepage: false }; }
+  }
+  return null;
+}
+
+// Probe a path and verify it returns real sustainability content (not a soft 404)
+async function probePathWithContentCheck(url) {
+  try {
+    const html = await proxyFetch(url, 8000);
+    if (!html) return false; // Can't read page content — don't trust it
+    const text = html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+    const lower = text.toLowerCase();
+    // Reject soft 404s / error pages
+    if (/\b(page not found|404|this page (doesn.?t|does not) exist|no longer (available|exists)|oops.*something went wrong|file not found|error 404)\b/i.test(lower.slice(0, 600))
+        && !/sustainab|esg|carbon|net.?zero|emission|climate|renewable/i.test(lower.slice(0, 2000))) {
+      return false;
+    }
+    // Accept if page has sustainability substance
+    if (/sustainab|esg|environment|carbon|net.?zero|emission|climate|renewable|scope|ghg|responsib|csr/i.test(lower.slice(0, 4000))) {
+      return true;
+    }
+    // No keywords but not a 404 either — could be a cookie wall blocking content
+    // Trust it and let scanAndExtractSusPage make the final call
+    return true;
+  } catch { return false; }
+}
+
+// Keep aiExtractSusData as a thin wrapper for manual paste flow
+async function aiExtractSusData(susUrl, companyName) {
+  const result = await scanAndExtractSusPage(susUrl, companyName);
+  return result.is_valid ? result : null;
+}
+
+// Extract net zero year directly from page text via regex — no AI needed
+// Returns { year, source, source_url, snippet } or null
+async function extractNZFromPageText(url, company) {
+  try {
+    const html = await proxyFetch(url, 12000);
+    if (!html) return null;
+    const text = html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+    // Only accept explicit "net zero by YEAR" or "carbon neutral by YEAR" — not reduction targets
+    const patterns = [
+      /\bnet[\s-]?zero\b[^.!?]{0,80}by\s+(20\d{2})/gi,
+      /\bcarbon[\s-]?neutral(?:ity)?\b[^.!?]{0,60}by\s+(20\d{2})/gi,
+      /(?:achieve|reach|become|attain|commit[a-z]*)\s+(?:to\s+)?net[\s-]?zero[^.!?]{0,60}(20\d{2})/gi,
+      /net[\s-]?zero\s+(?:by\s+)?(20\d{2})/gi,
+    ];
+
+    let bestYear = null;
+    let bestSnippet = null;
+
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      let m;
+      while ((m = pattern.exec(text)) !== null) {
+        const y = parseInt(m[1]);
+        if (y < 2025 || y > 2060) continue;
+        // Extract the surrounding sentence as a quote
+        const start = Math.max(0, m.index - 20);
+        const end = Math.min(text.length, m.index + m[0].length + 40);
+        const sentence = text.slice(start, end).replace(/\s+/g,' ').trim();
+        // Prefer the later (full-scope) target year
+        if (!bestYear || y > bestYear) {
+          bestYear = y;
+          bestSnippet = sentence.slice(0, 150);
+        }
+      }
+    }
+
+    if (bestYear) {
+      const domain = new URL(url).hostname.replace('www.','');
+      log('g', `  Net zero from page: ${bestYear} — "${bestSnippet}"`);
+      return { year: String(bestYear), source: domain, source_url: url, snippet: bestSnippet };
+    }
+  } catch (e) { log('r', `  extractNZFromPageText error: ${e.message}`); }
+  return null;
+}
+
+// ── DB helpers ─────────────────────────────────────────────────────────────
+function dbKey(r) { return (r.company||'').toLowerCase().trim(); }
+function dbMerge(r) { db[dbKey(r)] = { ...r }; }
+function dbGet(name) { return db[(name||'').toLowerCase().trim()]; }
+
+// ── Logging ────────────────────────────────────────────────────────────────
+function log(cls, msg) {
+  const el = document.getElementById('logLines');
+  if (!el) return;
+  const d = document.createElement('div');
+  d.className = 'log-' + cls;
+  d.textContent = msg;
+  el.appendChild(d);
+  // Auto-scroll the log-body div (parent of logLines)
+  const body = document.getElementById('logLines').parentElement;
+  if (body && !body.classList.contains('collapsed')) {
+    body.scrollTop = body.scrollHeight;
+  }
+}
+
+function toggleLog() {
+  const body = document.getElementById('logLines').parentElement;
+  const arrow = document.getElementById('logToggleArrow');
+  body.classList.toggle('collapsed');
+  arrow.classList.toggle('collapsed');
+}
+
+function copyLog() {
+  const el = document.getElementById('logLines');
+  if (!el) return;
+  const text = [...el.querySelectorAll('div')].map(d => d.textContent).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btnCopyLog');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = orig, 1800);
+  }).catch(() => toast('Copy failed — try selecting manually'));
+}
+
+function toast(msg, dur=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── Proxy fetch ─────────────────────────────────────────────────────────────
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}&cookie=1`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+];
+async function proxyFetch(url, timeout=12000, idx=0) {
+  if (idx >= PROXIES.length) return null;
+  try {
+    const r = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(timeout) });
+    if (r.ok) return await r.text();
+  } catch {}
+  return proxyFetch(url, timeout, idx+1);
+}
+
+async function quickCheckUrl(url, timeout=7000, skipRedirectCheck=false) {
+  // Try no-cors HEAD first — fast, works for most sites
+  let headOk = false;
+  try {
+    await fetch(url, { method:'HEAD', mode:'no-cors', signal: AbortSignal.timeout(timeout) });
+    headOk = true;
+  } catch {}
+  // Some servers reject HEAD — try a no-cors GET as fallback
+  if (!headOk) {
+    try {
+      await fetch(url, { method:'GET', mode:'no-cors', signal: AbortSignal.timeout(timeout) });
+      headOk = true;
+    } catch {}
+  }
+  if (!headOk) return false;
+  // For sus page URLs, verify via proxy that we haven't been redirected to a homepage
+  if (!skipRedirectCheck && isSusPageUrl && isSusPageUrl(url)) {
+    return await verifySusPageNotRedirected(url, timeout);
+  }
+  return true;
+}
+
+// Fetch via proxy and check the page wasn't silently redirected to a homepage
+async function verifySusPageNotRedirected(url, timeout=8000) {
+  try {
+    const r = await fetch(PROXIES[0](url), { signal: AbortSignal.timeout(timeout) });
+    if (!r.ok) return false;
+    // Some proxies expose the final URL after redirects
+    const finalUrl = r.url || url;
+    if (finalUrl && finalUrl !== PROXIES[0](url)) {
+      try {
+        const finalPath = new URL(finalUrl).pathname;
+        if (finalPath === '/' || finalPath === '/index.html') {
+          log('a', `  Redirect detected: ${url} → homepage`);
+          return false;
+        }
+      } catch {}
+    }
+    // Check page body: if it has a sus keyword it's genuine; if it looks like a homepage reject it
+    const text = await r.text().catch(() => '');
+    const stripped = text.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0, 3000);
+    const hasSusContent = /net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]/i.test(stripped);
+    const looksLikeHomepage = !hasSusContent && /home|welcome|leading|solutions|products|services|contact us/i.test(stripped.slice(0, 500));
+    if (!hasSusContent && looksLikeHomepage) {
+      log('a', `  Sus page rejected: content looks like homepage redirect (${url})`);
+      return false;
+    }
+    return true;
+  } catch {
+    return true; // proxy failed — assume ok, will be caught later by scanAndExtractSusPage
+  }
+}
+
+// ── DDG search ─────────────────────────────────────────────────────────────
+const SITE_BLOCK = /linkedin|facebook|twitter|x\.com|youtube|instagram|tiktok|companies\.gov|find-and-update\.company|endole|dnb\.com|zoominfo|glassdoor|indeed|totaljobs|reed\.co|trustpilot|yelp|wikipedia|bloomberg|crunchbase|pitchbook|reuters|guardian|telegraph|bbc\.|ft\.com|theguardian|dailymail|forbes|businessinsider|duedil|opencorporates|bizdb|companycheck|cylex|yell\.com|companiesintheuk|charities\.gov/i;
+
+function extractUrlsFromHtml(html, targetDomain) {
+  const urls = [];
+  const seen = new Set();
+
+  function addUrl(raw) {
+    try {
+      // Handle double-encoded URLs
+      let decoded = raw;
+      if (decoded.includes('%25')) decoded = decodeURIComponent(decoded);
+      if (decoded.includes('%')) decoded = decodeURIComponent(decoded);
+      if (decoded.startsWith('//')) decoded = 'https:' + decoded;
+      const u = new URL(decoded);
+      const host = u.hostname.toLowerCase();
+      if (SITE_BLOCK.test(host)) return;
+      if (host.includes('duckduckgo') || host.includes('google.com') || host.includes('bing.com')) return;
+      if (targetDomain && !host.includes(targetDomain.replace('www.',''))) return;
+      const clean = u.origin + u.pathname;
+      if (!seen.has(clean)) { seen.add(clean); urls.push(clean); }
+    } catch {}
+  }
+
+  // 1. Standard href="https://..." links
+  const reHref = /href="(https?:\/\/[^"\s]+)"/g;
+  let m;
+  while ((m = reHref.exec(html)) !== null) addUrl(m[1]);
+
+  // 2. DDG uddg= redirect links (all formats, including &amp; encoded)
+  // Handles: href="/l/?uddg=URL", href="//duckduckgo.com/l/?kh=-1&amp;uddg=URL&amp;rut=..."
+  // Also handles HTML-entity encoded &amp; before uddg
+  const htmlDecoded = html.replace(/&amp;/g, '&');
+  const reDdg = /uddg=([^&"\s<>]+)/g;
+  while ((m = reDdg.exec(htmlDecoded)) !== null) {
+    try {
+      const decoded = decodeURIComponent(m[1]);
+      if (decoded.startsWith('http')) addUrl(decoded);
+    } catch {}
+  }
+
+  // 3. result__url text content (DDG shows the raw URL as text in .result__url spans)
+  const reResultUrl = /class="result__url[^"]*"[^>]*>\s*([^<]+?)\s*<\/span>/g;
+  while ((m = reResultUrl.exec(html)) !== null) {
+    const text = m[1].trim();
+    if (text && !text.includes(' ') && text.includes('.')) {
+      const url = text.startsWith('http') ? text : 'https://' + text;
+      addUrl(url);
+    }
+  }
+
+  // 4. result__a href attributes (may be relative /l/ paths or absolute)
+  const reResultA = /class="result__a[^"]*"[^>]*href="([^"]+)"/g;
+  while ((m = reResultA.exec(htmlDecoded)) !== null) {
+    const href = m[1];
+    if (href.startsWith('http')) addUrl(href);
+    else if (href.startsWith('//')) addUrl('https:' + href);
+    else if (href.includes('uddg=')) {
+      const uddg = href.match(/uddg=([^&"\s]+)/);
+      if (uddg) try { addUrl(decodeURIComponent(uddg[1])); } catch {}
+    }
+  }
+
+  // 5. Bing search result links: <cite>domain.com/path</cite>
+  const reCite = /<cite[^>]*>([^<]{5,100})<\/cite>/g;
+  while ((m = reCite.exec(html)) !== null) {
+    const text = m[1].replace(/&amp;/g,'&').replace(/<[^>]+>/g,'').trim();
+    if (text.includes('.') && !text.includes(' ')) addUrl('https://' + text);
+  }
+
+  return urls;
+}
+
+// Search via multiple engines for best coverage
+async function multiSearch(query, targetDomain) {
+  // Try DDG first (HTML endpoint via POST - most reliable if CORS works)
+  const ddgPost = async () => {
+    try {
+      const r = await fetch('https://html.duckduckgo.com/html/', {
+        method:'POST', mode:'cors',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'text/html'},
+        body:'q='+encodeURIComponent(query)+'&kl=uk-en&kp=-1',
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) {
+        const html = await r.text();
+        const urls = extractUrlsFromHtml(html, targetDomain);
+        if (urls.length > 0) return urls;
+      }
+    } catch {}
+    return null;
+  };
+
+  // Try DDG via proxy (GET request)
+  const ddgProxy = async () => {
+    const url = 'https://html.duckduckgo.com/html/?q='+encodeURIComponent(query)+'&kl=uk-en&kp=-1';
+    const html = await proxyFetch(url, 10000);
+    if (!html) return null;
+    const urls = extractUrlsFromHtml(html, targetDomain);
+    if (urls.length > 0) return urls;
+    // Log what we found vs what matched
+    const allUrls = extractUrlsFromHtml(html, null);
+    if (allUrls.length > 0) log('b', `  DDG proxy: ${allUrls.length} total URLs, 0 matched domain "${targetDomain||'any'}"`);
+    return null;
+  };
+
+  // Try Bing via proxy as fallback
+  const bingProxy = async () => {
+    const url = 'https://www.bing.com/search?q='+encodeURIComponent(query)+'&setmkt=en-GB&setlang=en';
+    const html = await proxyFetch(url, 10000);
+    if (!html) return null;
+    const urls = extractUrlsFromHtml(html, targetDomain);
+    if (urls.length > 0) { log('b', `  Bing: found ${urls.length} URLs`); return urls; }
+    return null;
+  };
+
+  const result = await ddgPost();
+  if (result) return result;
+  const result2 = await ddgProxy();
+  if (result2) return result2;
+  const result3 = await bingProxy();
+  if (result3) return result3;
+  return [];
+}
+
+// ddgDirect is now an alias for multiSearch for backward compatibility
+async function ddgDirect(query, targetDomain) {
+  return multiSearch(query, targetDomain);
+}
+
+// ── Company name utils ──────────────────────────────────────────────────────
+const LEGAL_SUFFIXES = /\b(limited|ltd\.?|plc|llp|llc|inc\.?|corp\.?|group|holdings?|international|services|solutions|technologies|consulting|associates|partners)\b/gi;
+// Generic industry/descriptor words unlikely to appear in a domain
+const GENERIC_WORDS = /\b(cement|lime|timber|stone|paints?|gypsum|steel|glass|plastics?|chemicals?|minerals?|aggregates?|concrete|asphalt|building|construction|products?|manufacturing|industries|engineering|systems?|company|enterprises?|and|of|the|for|by|in|at|uk|gb|europe|global|home|appliances?)\b/gi;
+
+function cleanCompanyName(name) {
+  return name
+    .replace(/\(([^)]+)\)/g, ' $1 ')   // (NEFF) → NEFF, (UK) → UK
+    .replace(LEGAL_SUFFIXES, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+// Returns the most domain-relevant words from a name — strips legal suffixes AND generic descriptors
+function domainWords(name) {
+  const stripped = name
+    .replace(/\(([^)]+)\)/g, ' $1 ')   // expand brackets before stripping
+    .replace(LEGAL_SUFFIXES, '')
+    .replace(GENERIC_WORDS, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .replace(/\s+/g,' ').trim().toLowerCase();
+  return stripped.split(/\s+/).filter(w => w.length > 2);
+}
+function getTradingName(name) {
+  const m = name.match(/^(.+?)\s*(?:t\/a|trading as|also known as|dba)\s*(.+)$/i);
+  return m ? m[2].trim() : null;
+}
+
+// ── Website search ──────────────────────────────────────────────────────────
+async function findWebsite(companyName) {
+  const trading    = getTradingName(companyName);
+  const clean      = cleanCompanyName(companyName);
+  const searchName = trading || clean;
+  log('b', `  Searching for "${searchName}" website...`);
+
+  // Use domain-relevant words only (strips generic descriptors like "cement", "lime", "paints")
+  const keyWords = domainWords(companyName);
+  // Also keep full clean words as fallback
+  const allWords = clean.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(w => w.length > 2);
+  const keyPhrase = keyWords.join(' ');
+
+  const queries = [
+    `${searchName}`,
+    `${searchName} official website`,
+    `"${searchName}" site`,
+    `${clean} UK company`,
+    // Search using just the distinctive key words — catches cases where legal name diverges from brand
+    ...(keyPhrase && keyPhrase !== searchName.toLowerCase() ? [`${keyPhrase} official website UK`] : []),
+    ...(keyWords[0] && keyWords[0].length > 3 ? [`${keyWords[0]} UK company website`] : []),
+  ];
+
+  // Fire all queries simultaneously
+  const allUrlSets = await Promise.all(queries.map(q => ddgDirect(q, null).catch(() => [])));
+
+  function scoreDomain(domain) {
+    const base = domain
+      .replace(/\.co\.uk$|\.org\.uk$|\.com$|\.co$|\.org$|\.net$|\.uk$/, '')
+      .replace(/-/g,'') // treat hyphens as nothing: british-gypsum → britishgypsum
+      .toLowerCase();
+    // Exact matches
+    if (base === searchName.toLowerCase().replace(/\s+/g,'')) return 10;
+    if (base === clean.toLowerCase().replace(/\s+/g,'')) return 9;
+    if (keyWords.length > 0 && base === keyWords.join('')) return 8;
+
+    // Word-boundary aware matching:
+    // A keyword matches if:
+    //   (a) it appears at the START of the domain base (prefix: "crown" in "crownpaints")
+    //   (b) it appears at the END of the domain base (suffix: "gypsum" in "britishgypsum")
+    //   (c) it's a full standalone word (not extending into a longer word mid-domain)
+    // We REJECT mid-domain substring matches where the word is embedded in a longer word
+    // e.g. "traffi" in "roadtraffic" — starts at index 4, not at 0, and extends → reject
+    function wordMatch(base, word) {
+      const idx = base.indexOf(word);
+      if (idx === -1) return false;
+      const before = base[idx - 1];
+      const after  = base[idx + word.length];
+      // Prefix: word starts the domain (idx===0) — always accept even if more chars follow
+      if (idx === 0) return true;
+      // Suffix: word ends the domain — always accept
+      if (!after) return true;
+      // Mid-domain: only accept if surrounded by non-alpha (e.g. hyphens already stripped, so unlikely)
+      if (before && /[a-z]/.test(before)) return false; // preceded by a letter = embedded
+      if (after  && /[a-z]/.test(after))  return false; // followed by a letter = embedded
+      return true;
+    }
+
+    const keyMatches = keyWords.filter(w => wordMatch(base, w)).length;
+    const allMatches = allWords.filter(w => wordMatch(base, w)).length;
+
+    // Accept if any key word matches cleanly, OR if 2+ of all words match cleanly
+    if (keyMatches === 0 && allMatches < 2) return 0;
+    let score = (keyMatches * 3) + (allMatches * 1);
+    if (domain.endsWith('.co.uk') || domain.endsWith('.org.uk') || domain.endsWith('.uk')) score += 1;
+    return score;
+  }
+
+  const seen = new Set();
+  const candidates = [];
+  for (const urls of allUrlSets) {
+    for (const u of urls) {
+      let hostname;
+      try { hostname = new URL(u).hostname.toLowerCase(); } catch { continue; }
+      if (SITE_BLOCK.test(hostname)) continue;
+      // Block login/webmail/app/portal subdomains — these are never the company's main website
+      if (/^(login|webmail|mail|app|portal|secure|auth|sso|accounts?|my|web)\./i.test(hostname.replace('www.',''))) continue;
+      const domain = hostname.replace('www.','');
+      if (seen.has(domain)) continue;
+      seen.add(domain);
+      const score = scoreDomain(domain);
+      if (score > 0) candidates.push({ domain, score });
+    }
+  }
+  candidates.sort((a,b) => b.score - a.score);
+
+  // Enforce minimum score — drop weak matches entirely rather than fall back to them
+  // score 3 = one keyword match, score 4 = one keyword + .co.uk — both too loose for reliability
+  candidates.splice(0, candidates.length, ...candidates.filter(c => c.score >= 5));
+
+  if (candidates.length === 0) {
+    // Debug: show what domains were seen but rejected
+    const allSeen = [];
+    for (const urls of allUrlSets) {
+      for (const u of urls) {
+        try { allSeen.push(new URL(u).hostname.replace('www.','')); } catch {}
+      }
+    }
+    const unique = [...new Set(allSeen)].slice(0,8);
+    log('a', `  No scored candidates for "${companyName}" — rejected domains: [${unique.join(', ')}]`);
+    return null;
+  }
+  log('b', `  ${candidates.length} candidates — best: ${candidates[0].domain} (score ${candidates[0].score}), keyWords: [${keyWords.join(', ')}]`);
+
+  for (const { domain, score } of candidates) {
+    const ok = await quickCheckUrl(`https://${domain}`);
+    if (ok) { log('g', `  Found: ${domain} (score ${score})`); return domain; }
+  }
+  log('a', `  Could not reach any candidate for "${companyName}"`);
+  return null;
+}
+
+// ── Sustainability page ─────────────────────────────────────────────────────
+const SUS_PATH_KW = /sustainab|esg|environment|carbon|net.?zero|climate|responsibility|impact|csr|corporate-social|green|bcorp|b-corp/i;
+
+async function confirmSusPage(url) {
+  if (!isSusPageUrl(url)) return null;
+  // Skip redirect verification for explicitly-named sus URLs — proxy may return cookie walls
+  const urlPath = (() => { try { return new URL(url).pathname.toLowerCase(); } catch { return ''; } })();
+  const skipCheck = /sustainab|esg|environment|carbon|net.?zero|climate|responsib|csr/i.test(urlPath);
+  const ok = await quickCheckUrl(url, 7000, skipCheck);
+  return ok ? url : null;
+}
+
+async function findSusUrl(website, companyName) {
+  const base = website.startsWith('http') ? website : 'https://'+website;
+  let domain;
+  try { domain = new URL(base).hostname.replace('www.',''); } catch { return null; }
+  const name = companyName || domain;
+  const clean = cleanCompanyName(name);
+  const searchName = getTradingName(name) || clean;
+  const domainStem = domain.split('.')[0];
+  log('b', `  Searching for ${name} sustainability page...`);
+
+  const QUERIES = [
+    `${domainStem} sustainability`,
+    `${domainStem} net zero carbon`,
+    `${domainStem} ESG environment`,
+    `${searchName} sustainability page`,
+  ];
+
+  const allUrlSets = await Promise.all(QUERIES.map(q => ddgDirect(q, domain).catch(() => [])));
+  const allUrlSetsWide = await Promise.all(QUERIES.slice(0,2).map(q => ddgDirect(q, null).catch(() => [])));
+  const combined = [...allUrlSets, ...allUrlSetsWide];
+
+  const seen = new Set();
+  const candidates = [];
+  for (const urls of combined) {
+    for (const url of urls) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      try {
+        const urlDomain = new URL(url).hostname.replace('www.','');
+        if (!urlDomain.includes(domain) && !domain.includes(urlDomain)) continue;
+        const path = new URL(url).pathname.toLowerCase();
+        // Block news/blog/press paths — these score high on DDG but aren't sus pages
+        if (SUS_PATH_BLOCK.test(path)) continue;
+        // Block product/service paths — these aren't sus pages even if they mention sustainability
+        if (/\/product|\/service|\/solution|\/shop|\/store|\/buy|\/order/i.test(path)) continue;
+        const depth = path.split('/').filter(Boolean).length;
+        const hasKw = SUS_PATH_KW.test(path) ? 3 : 0;
+        candidates.push({ url, score: depth + hasKw });
+      } catch { }
+    }
+  }
+  candidates.sort((a,b) => b.score - a.score);
+  log('b', `  ${candidates.length} sus candidates`);
+
+  for (const { url } of candidates.slice(0,12)) {
+    const confirmed = await confirmSusPage(url);
+    if (confirmed) { log('g', `  Found: ${confirmed}`); return confirmed; }
+  }
+
+  // Last resort: probe common sustainability paths with content verification
+  const commonPaths = [
+    '/sustainability', '/esg', '/environment', '/corporate-responsibility',
+    '/csr', '/about/sustainability', '/about/environment', '/about/esg',
+    '/company/sustainability', '/our-impact', '/net-zero', '/carbon',
+    '/responsibility', '/climate', '/impact', '/green',
+  ];
+  log('b', `  Probing common sus paths on ${domain}...`);
+  for (const p of commonPaths) {
+    const url = `https://${domain}${p}`;
+    const found = await probePathWithContentCheck(url);
+    if (found) { log('g', `  Found via probe: ${url}`); return url; }
+  }
+
+  log('a', `  No sustainability page found for ${name}`);
+  return null;
+}
+
+// ── Document relevance scoring ───────────────────────────────────────────────
+// Returns 'high' | 'medium' | 'low' | null (null = irrelevant, skip entirely)
+const DOC_HIGH_URL   = /net.?zero|carbon.?reduc|carbon.?plan|transition.?plan|sustainability.?plan|sustainability.?report|esg.?report/i;
+const DOC_HIGH_TITLE = /net.?zero|carbon.?reduc|carbon.?plan|transition.?plan|sustainability.?plan|sustainability.?report|esg.?report/i;
+const DOC_MED_URL    = /annual.?report|impact.?report|climate|environment|csr|bcorp|scope/i;
+const DOC_MED_TITLE  = /annual.?report|impact.?report|climate|environment|csr|bcorp|scope|responsib/i;
+const DOC_LOW_URL    = /report|policy|framework|strategy|plan|commitments?/i;
+const DOC_LOW_TITLE  = /report|policy|framework|strategy|plan|commitments?|sustainab|environment|green|carbon/i;
+
+function scoreDocumentRelevance(url, title) {
+  const u = (url   || '').toLowerCase();
+  const t = (title || '').toLowerCase();
+  const isPdf = /\.pdf(\?|$)/i.test(url);
+
+  // High: explicitly named sustainability/NZ/carbon/ESG document
+  if (DOC_HIGH_URL.test(u) || DOC_HIGH_TITLE.test(t)) return 'high';
+
+  // Medium: annual report or climate/environment doc — likely contains sustainability section
+  if (isPdf && (DOC_MED_URL.test(u) || DOC_MED_TITLE.test(t))) return 'medium';
+
+  // Low: PDF with a report/policy/strategy-sounding keyword — must have a meaningful signal
+  if (isPdf && (DOC_LOW_URL.test(u) || DOC_LOW_TITLE.test(t))) return 'low';
+
+  // Non-PDF with clear sustainability name in URL path
+  if (!isPdf && /sustainab|esg|environment|carbon|net.?zero|climate|responsib|csr/i.test(u)) return 'medium';
+
+  // Non-PDF with medium-confidence keyword
+  if (DOC_MED_URL.test(u) || DOC_MED_TITLE.test(t)) return 'medium';
+
+  return null; // no relevance signal — skip
+}
+
+// Keep for backward-compat with calcMaturity (high-confidence docs only count for plan bonus)
+function isValidTransitionPlan(url, title) {
+  return scoreDocumentRelevance(url, title) === 'high';
+}
+
+async function findReportUrl(website, companyName) {
+  const base = website.startsWith('http') ? website : 'https://'+website;
+  let domain;
+  try { domain = new URL(base).hostname.replace('www.',''); } catch { return null; }
+  const name = companyName || domain;
+  log('b', `  Searching for ${name} sustainability document...`);
+
+  // All queries are domain-restricted — we never return docs from other companies\'s sites
+  const QUERIES = [
+    `"${name}" sustainability report filetype:pdf site:${domain}`,
+    `"${name}" net zero OR ESG OR carbon plan filetype:pdf site:${domain}`,
+    `"${name}" annual report sustainability site:${domain}`,
+    `${name} sustainability report site:${domain}`,
+    `sustainability report filetype:pdf site:${domain}`,
+    `annual report filetype:pdf site:${domain}`,
+  ];
+
+  // Always filter by domain — never accept off-domain documents
+  const allUrlSets = await Promise.all(
+    QUERIES.map(q => ddgDirect(q, domain).catch(() => []))
+  );
+
+  // Also crawl the company\'s own sustainability page for PDF links
+  const susPageDocs = await crawlSusPageForDocs(base, domain);
+
+  const seen = new Set();
+  const candidates = [];
+
+  // Add crawled docs first — they are definitively on-domain
+  for (const { url, conf, title } of susPageDocs) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    candidates.push({ url, conf, title, score: (conf === 'high' ? 4 : conf === 'medium' ? 2 : 1) + 4 });
+  }
+
+  for (let qi = 0; qi < allUrlSets.length; qi++) {
+    for (const url of allUrlSets[qi]) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      // Hard requirement: URL must be on the company\'s domain
+      let urlDomain;
+      try { urlDomain = new URL(url).hostname.replace('www.',''); } catch { continue; }
+      if (!urlDomain.includes(domain) && !domain.includes(urlDomain)) {
+        log('b', `  Doc rejected (wrong domain: ${urlDomain}): ${url}`);
+        continue;
+      }
+      const title = getDocTitle(url);
+      const conf = scoreDocumentRelevance(url, title);
+      if (!conf) continue;
+      const queryBonus = qi < 2 ? 3 : qi < 4 ? 1 : 0;
+      const confScore = conf === 'high' ? 4 : conf === 'medium' ? 2 : 1;
+      candidates.push({ url, conf, title, score: confScore + queryBonus });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  log('b', `  ${candidates.length} document candidates`);
+
+  for (const { url, conf, title } of candidates) {
+    const ok = await quickCheckUrl(url, 7000, true);
+    if (ok) {
+      log('g', `  Document found [${conf}]: ${url}`);
+      return { url, doc_confidence: conf, title: title || getDocTitle(url) };
+    }
+  }
+  return null;
+}
+
+// Crawl the company\'s sustainability page (and homepage) looking for PDF/doc links
+async function crawlSusPageForDocs(baseUrl, domain) {
+  const results = [];
+  const seen = new Set();
+
+  async function scanPageForDocs(pageUrl) {
+    const html = await proxyFetch(pageUrl, 10000);
+    if (!html) return;
+    const re = /href=["\']([^"\'#\s]{5,300})["\'][^>]*>/gi;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      let href = m[1].trim();
+      if (!href) continue;
+      // Resolve relative URLs
+      try {
+        const full = new URL(href, pageUrl).href.split('?')[0].split('#')[0];
+        if (seen.has(full)) continue;
+        seen.add(full);
+        // Must be on company domain
+        const h = new URL(full).hostname.replace('www.','');
+        if (!h.includes(domain) && !domain.includes(h)) continue;
+        const title = getDocTitle(full);
+        const conf = scoreDocumentRelevance(full, title);
+        if (conf) results.push({ url: full, conf, title });
+      } catch {}
+    }
+  }
+
+  // Scan homepage and common sus paths
+  const paths = ['', '/sustainability', '/esg', '/environment', '/about/sustainability', '/csr', '/corporate-responsibility'];
+  for (const p of paths.slice(0, 3)) { // limit to first 3 to avoid too many requests
+    try { await scanPageForDocs(baseUrl.replace(/\/$/, '') + p); } catch {}
+  }
+
+  return results;
+}
+
+function getDocTitle(url) {
+  try {
+    const p = new URL(url).pathname;
+    const file = p.split('/').pop() || '';
+    return decodeURIComponent(file).replace(/\.pdf$/i,'').replace(/[-_]/g,' ').replace(/\s+/g,' ').trim() || null;
+  } catch { return null; }
+}
+
+// ── Net zero target search ───────────────────────────────────────────────────
+// Only called when page-level extraction found nothing.
+// Uses AI knowledge fallback only — DDG snippets are too unreliable to trust.
+async function findNetZeroTarget(company) {
+  if (!aiEnabled()) return null;
+  log('b', `  AI looking up net zero target for "${company}"...`);
+  const answer = await aiAsk(
+    `Does the company "${company}" have a publicly stated net zero or carbon neutrality target year?\n` +
+    `Only answer if you are certain this is the company's OWN publicly stated commitment — not a sector average, government policy, industry target, or passing reference.\n` +
+    `You must be able to cite a specific public source (e.g. their sustainability page or annual report).\n` +
+    `Reply ONLY with JSON: {"year": <4-digit year or null>, "confidence": "high"/"low", "source": "<specific source e.g. company sustainability report 2023>", "quote": "<exact short quote from that source>"}\n` +
+    `Return null for year if you cannot cite a specific source or are not certain.`,
+    120
+  );
+  if (!answer) return null;
+  try {
+    const parsed = JSON.parse(answer.replace(/```json|```/g,'').trim());
+    if (parsed.year && String(parsed.year).match(/^20[2-6]\d$/) && parsed.confidence === 'high' && parsed.quote) {
+      log('g', `  AI found net zero target: ${parsed.year} — "${parsed.quote}"`);
+      return { year: String(parsed.year), source: parsed.source || 'AI knowledge', source_url: null, snippet: parsed.quote };
+    } else if (parsed.year) {
+      log('b', `  AI suggested ${parsed.year} but confidence="${parsed.confidence}" or no quote — discarding`);
+    }
+  } catch {}
+  return null;
+}
+
+// ── External lookups ─────────────────────────────────────────────────────────
+// ── SBTi check via official API ──────────────────────────────────────────────
+// Uses the SBTi public Companies API — no login required
+async function checkSBTi(company) {
+  try {
+    const clean = cleanCompanyName(company);
+    // SBTi provides a public companies endpoint — search by name
+    const apiUrl = `https://sciencebasedtargets.org/api/v1/resources/search/?query=${encodeURIComponent(clean)}&kind=Company&page_size=5`;
+    const json = await proxyFetch(apiUrl, 10000);
+    if (json) {
+      try {
+        const data = JSON.parse(json);
+        const results = data.results || data.data || [];
+        // Find a result that closely matches our company name
+        const match = results.find(r => {
+          const rName = (r.name || r.company_name || '').toLowerCase();
+          const target = clean.toLowerCase();
+          return rName.includes(target) || target.includes(rName) ||
+            rName.split(' ').some(w => w.length > 3 && target.includes(w));
+        });
+        if (match) {
+          const nearTerm = match.near_term_target_status || match.near_term_status || '';
+          const netZero  = match.net_zero_target_status  || match.net_zero_status  || '';
+          const temp     = match.near_term_temperature_goal || match.temperature || null;
+          log('g', `  SBTi match: ${match.name || clean} — near-term: ${nearTerm}, net zero: ${netZero}`);
+          return {
+            sbti_near_term_status: nearTerm || null,
+            sbti_net_zero_status:  netZero  || null,
+            sbti_temperature: temp ? String(temp).replace(/°?C?$/,'')+'°C' : null,
+          };
+        }
+      } catch {}
+    }
+
+    // Fallback: try the SBTi companies search page via proxy and parse the HTML table
+    const searchUrl = `https://sciencebasedtargets.org/companies-taking-action#table`;
+    // Try searching directly for the company on the SBTi site
+    const searchQ = `${clean} site:sciencebasedtargets.org`;
+    const searchUrls = await multiSearch(searchQ, 'sciencebasedtargets.org');
+    if (searchUrls.length === 0) return null;
+
+    const pageHtml = await proxyFetch(searchUrls[0], 10000);
+    if (!pageHtml) return null;
+
+    // Check if this company specifically appears on the SBTi page
+    const cleanLower = clean.toLowerCase();
+    const pageText = pageHtml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').toLowerCase();
+    if (!pageText.includes(cleanLower) && !cleanLower.split(' ').every(w => w.length < 4 || pageText.includes(w))) {
+      log('b', `  SBTi page found but company name "${clean}" not confirmed on page`);
+      return null;
+    }
+
+    const nearTerm = /targets?\s*set|committed/i.test(pageHtml) ? 'Targets set' : null;
+    const temp = pageHtml.match(/([1-2]\.[0-9]+)\s*[°]?C/)?.[1];
+    if (!nearTerm) return null;
+    log('g', `  SBTi confirmed via page for ${clean}`);
+    return { sbti_near_term_status: nearTerm, sbti_net_zero_status: nearTerm, sbti_temperature: temp ? temp+'°C' : null };
+  } catch { return null; }
+}
+
+// ── CDP check via AI knowledge ────────────────────────────────────────────────
+// CDP scores require login on cdp.net — use AI knowledge instead which is reliable
+// for publicly reported scores from major disclosure databases
+async function checkCDP(company) {
+  if (!aiEnabled()) return null;
+  try {
+    const clean = cleanCompanyName(company);
+    const answer = await aiAsk(
+      `Does the company "${clean}" have a CDP (Carbon Disclosure Project) climate score? ` +
+      `CDP scores are: A (Leadership), A- , B (Management), B-, C (Awareness), C-, D (Disclosure), D-, or F (non-disclosure). ` +
+      `Only answer if you are certain of the specific score from a reliable public source. ` +
+      `Reply ONLY with JSON: {"score": "<letter score or null>", "year": <year or null>, "confidence": "high"/"low"} ` +
+      `Return null score if you are not certain.`,
+      80
+    );
+    if (!answer) return null;
+    const parsed = JSON.parse(answer.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    if (parsed.score && parsed.confidence === 'high' && /^[A-DF][\-]?$/.test(parsed.score)) {
+      log('g', `  CDP score confirmed: ${parsed.score} (${parsed.year || 'year unknown'})`);
+      return { cdp_score: parsed.score.toUpperCase() };
+    }
+  } catch {}
+  return null;
+}
+
+// ── SME Climate Hub check ─────────────────────────────────────────────────────
+async function checkSMEHub(company) {
+  try {
+    const clean = cleanCompanyName(company);
+    // Try the SME Climate Hub commitment page directly
+    const commitUrl = `https://smeclimatehub.org/sme-climate-commitment/?search=${encodeURIComponent(clean)}`;
+    const html = await proxyFetch(commitUrl, 10000);
+    if (html) {
+      const text = html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+      const cleanLower = clean.toLowerCase();
+      const words = cleanLower.split(' ').filter(w => w.length > 3);
+      const found = text.toLowerCase().includes(cleanLower) ||
+        (words.length >= 2 && words.every(w => text.toLowerCase().includes(w)));
+      if (found) {
+        log('g', `  SME Climate Hub: ${clean} found on commitment page`);
+        return { sme_hub_member: true, sme_hub_url: commitUrl };
+      }
+    }
+    // Fallback: search via multiSearch
+    const urls = await multiSearch(`"${clean}" smeclimatehub.org`, 'smeclimatehub.org');
+    if (urls.length > 0) {
+      log('g', `  SME Climate Hub: found via search`);
+      return { sme_hub_member: true, sme_hub_url: urls[0] };
+    }
+    return null;
+  } catch { return null; }
+}
+
+// ── Core processing ──────────────────────────────────────────────────────────
+async function processOne(row) {
+  const company = String(row['Company Name']||row['company']||'').trim();
+  if (!company) return null;
+
+  const cached = dbGet(company);
+  let website = (row['Website']||row['website']||cached?.website||'').replace(/^https?:\/\//,'').replace(/\/$/,'').trim();
+
+  const base = { company, website, extraction_date: new Date().toISOString().slice(0,10) };
+
+  // Step 1: Website
+  if (!website) {
+    log('b', `  No website for ${company} — searching...`);
+    if (aiEnabled()) {
+      // AI first — faster and more reliable than DDG
+      log('b', `  🧠 AI looking up website for "${company}"...`);
+      website = await aiFindWebsite(company);
+    }
+    if (!website) {
+      // DDG fallback (or primary if no AI key)
+      website = await findWebsite(company);
+    }
+    if (website) { base.website = website; }
+    else {
+      const sQ = encodeURIComponent(cleanCompanyName(company)+' official website');
+      return { ...base, status:'Website not found', google_search_url:`https://www.google.com/search?q=${sQ}` };
+    }
+  }
+
+  // Step 2: Sustainability page — find, validate, and extract data in one pass
+  let susUrl = (row['Sustainability URL']||row['sustainability_url']||cached?.sustainability_url||'').trim();
+  let susFromHomepage = false;
+  let susExtracted = null;
+  if (!susUrl) {
+    log('b', `  Got website: ${website} — searching sustainability page...`);
+    if (aiEnabled()) {
+      log('b', `  🧠 AI finding sustainability page on ${website}...`);
+      const aiResult = await aiFindSusPage(website, company);
+      if (aiResult) { susUrl = aiResult.url; susFromHomepage = aiResult.fromHomepage; }
+    }
+    if (!susUrl) {
+      susUrl = await findSusUrl(website, company);
+      susFromHomepage = false;
+    }
+    if (!susUrl) {
+      return { ...base, status:'Sustainability page not found' };
+    }
+  }
+
+  // Scan and validate the found page, extract data if AI available
+  if (susUrl) {
+    // Final URL sanity check — block blog subdomains, news paths etc.
+    if (!isSusPageUrl(susUrl)) {
+      log('a', `  Skipping invalid sus URL: ${susUrl}`);
+      susUrl = null;
+      susExtracted = null;
+    } else {
+      susExtracted = await scanAndExtractSusPage(susUrl, company);
+      if (susExtracted && !susExtracted.is_valid) {
+        const failedUrl = susUrl;
+        // If URL came from actual same-domain homepage links and proxy failed (not AI content rejection), trust it
+        if (susFromHomepage && susExtracted.proxyFailed) {
+          log('b', `  Proxy failed but URL is from real homepage links — keeping`);
+          susExtracted = { url: susUrl, is_valid: true };
+        } else {
+          log('a', `  Sus page invalid — trying DDG fallback...`);
+          susUrl = null; susExtracted = null;
+          const ddgSusUrl = await findSusUrl(website, company);
+          // Only try DDG result if it's a different URL — same URL will fail the same way
+          if (ddgSusUrl && isSusPageUrl(ddgSusUrl) && ddgSusUrl !== failedUrl) {
+            const ddgExtracted = await scanAndExtractSusPage(ddgSusUrl, company);
+            if (ddgExtracted?.is_valid) { susUrl = ddgSusUrl; susExtracted = ddgExtracted; }
+          }
+        }
+      }
+    }
+  }
+
+  // Step 3: Transition plan doc
+  let planUrl = cached?.transition_plan_url || null;
+  let planDocConf = cached?.doc_confidence || null;
+  let planTitle = cached?.transition_plan_title || null;
+  if (!planUrl) {
+    const planResult = await findReportUrl(website, company);
+    if (planResult) {
+      planUrl = planResult.url;
+      planDocConf = planResult.doc_confidence;
+      planTitle = planResult.title;
+    }
+  }
+
+  // Step 4: Net zero target — prefer AI-extracted from page, then page text regex, then DDG
+  let nzYear = cached?.net_zero_target_year || null;
+  let nzSource = cached?.net_zero_source || null;
+  let nzSourceUrl = cached?.net_zero_source_url || null;
+  if (!nzYear && susExtracted?.net_zero_target_year) {
+    nzYear = susExtracted.net_zero_target_year;
+    nzSource = susExtracted.net_zero_source || (susUrl ? new URL(susUrl).hostname.replace('www.','') : 'sustainability page');
+    nzSourceUrl = susUrl || null;
+  }
+  // Page text regex pass (works without AI key)
+  if (!nzYear && susUrl) {
+    const pageNZ = await extractNZFromPageText(susUrl, company);
+    if (pageNZ) { nzYear = pageNZ.year; nzSource = pageNZ.source; nzSourceUrl = pageNZ.source_url; }
+  }
+  if (!nzYear) {
+    const nzRes = await findNetZeroTarget(company);
+    if (nzRes) { nzYear = nzRes.year; nzSource = nzRes.source || 'web search'; nzSourceUrl = nzRes.source_url || null; }
+  }
+
+  // Step 5: SBTi + CDP + SME (parallel)
+  const [sbtiRes, cdpRes, smeRes] = await Promise.all([
+    checkSBTi(company).catch(() => null),
+    checkCDP(company).catch(() => null),
+    checkSMEHub(company).catch(() => null),
+  ]);
+
+  const result = {
+    ...base,
+    status: 'Success',
+    sustainability_url: susUrl,
+    transition_plan_url: planUrl || null,
+    transition_plan_title: planTitle || (planUrl ? getDocTitle(planUrl) : null),
+    doc_confidence: planDocConf || null,
+    net_zero_target_year: nzYear || null,
+    net_zero_source: nzSource || null,
+    net_zero_source_url: nzSourceUrl || null,
+    // Extracted from sustainability page
+    emissions_reduction_target: susExtracted?.emissions_reduction_target || null,
+    carbon_data:                 susExtracted?.carbon_data                || null,
+    sustainability_summary:      susExtracted?.sustainability_summary      || null,
+    certifications:              susExtracted?.certifications              || null,
+    key_initiatives:             susExtracted?.key_initiatives             || null,
+    sbti_near_term_status: sbtiRes?.sbti_near_term_status || null,
+    sbti_net_zero_status:  sbtiRes?.sbti_net_zero_status  || null,
+    sbti_temperature:      sbtiRes?.sbti_temperature      || null,
+    cdp_score:             cdpRes?.cdp_score              || null,
+    sme_hub_member:        smeRes?.sme_hub_member         || false,
+    sme_hub_url:           smeRes?.sme_hub_url            || null,
+    ...(() => {
+      const cd = calcDataConfidence({
+        aiEnabled: aiEnabled(),
+        hasWebsite: !!website,
+        hasSusPage: !!susUrl,
+                susUsedTextFallback: !aiEnabled(),
+        hasNZ: !!nzYear,
+        nzFromPage: !!(susExtracted?.net_zero_target_year),
+        nzFromAiKnowledge: !susUrl && !!nzYear,
+        hasCarbonData: !!(susExtracted?.carbon_data),
+        hasSummary: !!(susExtracted?.sustainability_summary),
+        hasPlan: !!planUrl,
+        planConf: planDocConf,
+      });
+      return { confidence: cd.level, confidence_reasons: cd.reasons };
+    })(),
+  };
+  result.maturity_score = calcMaturity(result);
+  return result;
+}
+
+// ── Data confidence scoring ───────────────────────────────────────────────────
+// Returns { level: 'High'|'Medium'|'Low', reasons: string[] }
+function calcDataConfidence(opts) {
+  const {
+    aiEnabled, hasWebsite, hasSusPage, susProxyFailed, susUsedTextFallback,
+    hasNZ, nzFromPage, nzFromAiKnowledge, hasCarbonData, hasSummary,
+    hasPlan, planConf,
+  } = opts;
+
+  const positives = [];
+  const negatives = [];
+
+  if (!aiEnabled)          negatives.push('No AI key — data extracted via text patterns only');
+  if (!hasSusPage)         negatives.push('No sustainability page found');
+  if (susProxyFailed)      negatives.push('Sustainability page could not be read (proxy failure)');
+  if (susUsedTextFallback && hasSusPage && !susProxyFailed)
+                           negatives.push('Summary extracted via keyword matching, not AI');
+
+  if (hasSusPage && !susProxyFailed && aiEnabled)
+                           positives.push('Sustainability page found and read by AI');
+  else if (hasSusPage && !susProxyFailed)
+                           positives.push('Sustainability page found');
+
+  if (hasNZ && nzFromPage) positives.push('Net zero target extracted directly from page');
+  else if (hasNZ && nzFromAiKnowledge)
+                           negatives.push('Net zero year from AI general knowledge, not verified on page');
+  else if (hasNZ)          positives.push('Net zero target found');
+
+  if (hasCarbonData)       positives.push('Reported emissions data (Scope 1/2/3) found on page');
+  if (hasSummary && aiEnabled) positives.push('AI extracted sustainability summary from page');
+
+  if (hasPlan && planConf === 'high')   positives.push('High-confidence sustainability document found');
+  else if (hasPlan && planConf === 'medium') negatives.push('Document found but may not be a dedicated sustainability report');
+  else if (hasPlan && planConf === 'low')    negatives.push('Document found but relevance is uncertain');
+
+  const positiveScore = positives.length;
+  const negativeScore = negatives.length;
+
+  let level;
+  if (!hasSusPage || susProxyFailed) {
+    // Can't trust any data without a readable sustainability page
+    level = 'Low';
+  } else if (!aiEnabled || susUsedTextFallback) {
+    // No AI = text patterns only; sus page found = Medium floor; too many negatives = Low
+    level = negativeScore > positiveScore + 1 ? 'Low' : 'Medium';
+  } else if (positiveScore >= 3 && negativeScore <= 1) {
+    // Strong positive signals, at most one caveat
+    level = 'High';
+  } else if (negativeScore >= 2 || (negativeScore > 0 && positiveScore < 2)) {
+    level = 'Low';
+  } else {
+    level = 'Medium';
+  }
+
+  return { level, reasons: [...negatives.map(r => '⚠ ' + r), ...positives.map(r => '✓ ' + r)] };
+}
+
+// ── Maturity scoring ─────────────────────────────────────────────────────────
+function calcMaturity(r) {
+  // ── Tiered base score ───────────────────────────────────────────────────────
+  // Each tier is a prerequisite of the next. The base is determined by the
+  // highest tier achieved, then bonus points are added on top up to 20.
+  const hasNZ   = !!r.net_zero_target_year;
+  const hasPlan = !!r.transition_plan_url;
+  // Carbon data tier requires explicit reported emissions figures (Scope 1/2/3 tCO2e)
+  // emissions_reduction_target alone (e.g. "cut 46% by 2030") does NOT qualify
+  const hasCarbonData = !!(r.carbon_data && r.carbon_data.trim().length > 0);
+  const hasSusPage = !!r.sustainability_url;
+
+  let base = 0;
+  if (!hasSusPage) {
+    base = 0;                          // No sustainability page
+  } else if (hasNZ) {
+    base = 12;                         // Net zero target
+  } else if (hasCarbonData) {
+    base = 4;                          // Carbon data only
+  } else {
+    base = 1;                          // Sustainability page only
+  }
+
+  // ── Bonus points ──────────────────────────────────────────────────────────
+  let bonus = 0;
+  // Document bonus: high=2pts, medium=1pt, low=0pts
+  const docConf = r.doc_confidence;
+  if (hasPlan && docConf === 'high')   bonus += 2;
+  else if (hasPlan && docConf === 'medium') bonus += 1;
+  if (r.sbti_near_term_status === 'Targets set') bonus += 2;
+  if (r.sbti_net_zero_status  === 'Targets set') bonus += 1;
+  if (r.cdp_score)             bonus += 1;
+  if (r.sme_hub_member)        bonus += 1;
+  if (r.certifications)        bonus += 1;
+
+  return Math.min(base + bonus, 16);  // max reachable is 16, displayed out of 20
+}
+
+function maturityLabel(score) {
+  if (score >= 14) return { label:'Leading',    color:'var(--green)' };
+  if (score >=  9) return { label:'Advanced',   color:'var(--lime)' };
+  if (score >=  4) return { label:'Developing', color:'var(--amber)' };
+  if (score >=  1) return { label:'Early Stage',color:'var(--amber)' };
+  return { label:'No Data', color:'var(--text3)' };
+}
+
+function maturityNarrative(r, score, label, hasValidPlan, sbtiVerified, nzAchieved, carbonNeutral) {
+  if (!score) return 'No sustainability data found.';
+  const parts = [];
+  if (nzAchieved) parts.push('Claims net zero achieved.');
+  else if (carbonNeutral) parts.push('Carbon neutral certified.');
+  if (r.sustainability_url) parts.push('Has a dedicated sustainability page.');
+  if (hasValidPlan) parts.push('Publishes a transition/sustainability plan.');
+  if (r.net_zero_target_year) parts.push(`Net zero target: ${r.net_zero_target_year}.`);
+  if (sbtiVerified) parts.push('SBTi verified targets.');
+  if (r.cdp_score) parts.push(`CDP score: ${r.cdp_score}.`);
+  if (r.sme_hub_member) parts.push('SME Climate Hub member.');
+  if (!parts.length) parts.push('Limited public sustainability commitments found.');
+  return parts.join(' ');
+}
+
+// ── Search URL helpers ────────────────────────────────────────────────────────
+function susSearchUrl(company, website) {
+  const q = website ? `${website} sustainability` : `"${company}" sustainability ESG carbon`;
+  return 'https://www.google.com/search?q='+encodeURIComponent(q);
+}
+function docSearchUrl(company, website) {
+  const q = website
+    ? `${website} sustainability report carbon reduction plan filetype:pdf`
+    : `"${company}" sustainability report carbon reduction plan filetype:pdf`;
+  return 'https://www.google.com/search?q='+encodeURIComponent(q);
+}
+function nzSearchUrl(company, website) {
+  const q = website ? `${website} net zero target` : `"${company}" net zero target year`;
+  return 'https://www.google.com/search?q='+encodeURIComponent(q);
+}
+
+// ── Reject / override functions ───────────────────────────────────────────────
+function rejectWebsite(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  r.website = null;
+  r.sustainability_url = null;
+  r.transition_plan_url = null;
+  r.transition_plan_title = null;
+  r.net_zero_target_year = null;
+  r.status = 'Website not found';
+  r.maturity_score = 0;
+  dbMerge(r);
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast(`Website removed for ${r.company}`);
+}
+
+function rejectSusPage(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  r.sustainability_url = null;
+  r.status = 'Sustainability page not found';
+  r.maturity_score = calcMaturity(r);
+  dbMerge(r);
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast(`Sustainability page removed for ${r.company}`);
+}
+
+function rejectPlan(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  r.transition_plan_url = null;
+  r.transition_plan_title = null;
+  r.doc_confidence = null;
+  r.maturity_score = calcMaturity(r);
+  dbMerge(r);
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast(`Plan removed for ${r.company}`);
+}
+
+function rejectNetZeroTarget(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  r.net_zero_target_year = null;
+  r.maturity_score = calcMaturity(r);
+  dbMerge(r);
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast(`Net zero target removed`);
+}
+
+function setNetZeroTarget(idx, year) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  if (!/^20\d{2}$/.test(String(year).trim())) { toast('Invalid year — use e.g. 2035'); return; }
+  r.net_zero_target_year = String(year).trim();
+  r.net_zero_source = r.net_zero_source || 'manually entered';
+  r.maturity_score = calcMaturity(r);
+  dbMerge(r);
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast(`Net zero target set to ${year}`);
+}
+
+// ── Re-run functions ──────────────────────────────────────────────────────────
+async function reRunOne(idx, websiteOverride) {
+  const r = _rByIdx[idx];
+  if (!r || r.status === 'Running\u2026') return;
+  const btn = document.getElementById('rb_'+idx);
+  const inp = document.getElementById('ri_'+idx);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  const row = { 'Company Name': r.company };
+  if (websiteOverride) row['Website'] = websiteOverride;
+  else if (r.website) row['Website'] = r.website;
+
+  r.status = 'Running\u2026';
+  applyFilters();
+
+  document.getElementById('logWrap').style.display = 'block';
+  log('b', `Re-running: ${r.company}`);
+
+  try {
+    const result = await processOne(row);
+    if (result) {
+      result._idx = idx;
+      Object.assign(r, result);
+      dbMerge(r);
+      saveResultToDb(r).catch(()=>{}); // persist to Supabase
+    }
+  } catch(e) {
+    log('r', `Error: ${e.message}`);
+    r.status = 'Website not found';
+  }
+
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast(`Done: ${r.company}`);
+}
+
+function triggerRerun(idx) {
+  const inp = document.getElementById('ri_'+idx);
+  const url = inp ? inp.value.trim() : '';
+  reRunOne(idx, url || null);
+}
+function triggerRerunPanel(idx) {
+  const inp = document.getElementById('pri_'+idx);
+  const url = inp ? inp.value.trim() : '';
+  reRunOne(idx, url || null);
+}
+
+async function reRunSusPage(idx, urlOverride) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  // For manual paste: accept any plausible URL — don't block on path keywords
+  if (urlOverride) {
+    const trimmed = urlOverride.trim();
+    if (!trimmed.startsWith('http')) {
+      toast('Please enter a full URL starting with https://'); return;
+    }
+    r.status = 'Running\u2026';
+    applyFilters();
+    log('b', `Setting sustainability page manually: ${trimmed}`);
+    r.sustainability_url = trimmed;
+    r.status = 'Success';
+    if (!r.transition_plan_url) r.transition_plan_url = await findReportUrl(r.website, r.company);
+
+    // Always scan the page directly for net zero year (no AI key needed)
+    const pageNZ = await extractNZFromPageText(trimmed, r.company);
+    if (pageNZ) {
+      r.net_zero_target_year = pageNZ.year;
+      r.net_zero_source      = pageNZ.source;
+      r.net_zero_source_url  = pageNZ.source_url;
+    }
+    // Also run DDG search if page scan found nothing
+    if (!r.net_zero_target_year) {
+      const _nzR = await findNetZeroTarget(r.company);
+      if (_nzR) { r.net_zero_target_year = _nzR.year; r.net_zero_source = _nzR.source; r.net_zero_source_url = _nzR.source_url || null; }
+    }
+
+    // AI extraction from newly set sus page (enriches other fields)
+    if (aiEnabled()) {
+      const aiData = await aiExtractSusData(trimmed, r.company);
+      if (aiData) {
+        if (!r.net_zero_target_year && aiData.net_zero_target_year) { r.net_zero_target_year = String(aiData.net_zero_target_year); r.net_zero_source = new URL(trimmed).hostname.replace('www.',''); r.net_zero_source_url = trimmed; }
+        if (aiData.emissions_reduction_target) r.emissions_reduction_target = aiData.emissions_reduction_target;
+        if (aiData.carbon_data) r.carbon_data = aiData.carbon_data;
+        if (aiData.sustainability_summary) r.sustainability_summary = aiData.sustainability_summary;
+        if (aiData.key_initiatives) r.key_initiatives = aiData.key_initiatives;
+        if (aiData.certifications) r.certifications = aiData.certifications;
+      }
+    }
+    const [sbtiRes, cdpRes, smeRes] = await Promise.all([
+      checkSBTi(r.company).catch(()=>null),
+      checkCDP(r.company).catch(()=>null),
+      checkSMEHub(r.company).catch(()=>null),
+    ]);
+    if (sbtiRes) { r.sbti_near_term_status = sbtiRes.sbti_near_term_status; r.sbti_net_zero_status = sbtiRes.sbti_net_zero_status; r.sbti_temperature = sbtiRes.sbti_temperature; }
+    if (cdpRes) r.cdp_score = cdpRes.cdp_score;
+    if (smeRes) { r.sme_hub_member = smeRes.sme_hub_member; r.sme_hub_url = smeRes.sme_hub_url; }
+    r.maturity_score = calcMaturity(r);
+    dbMerge(r);
+    applyFilters(); updateStats(allResults);
+    if (document.getElementById('overlay').classList.contains('open') &&
+        document.getElementById('pName').textContent === r.company) openPanel(r);
+    toast('Sustainability page saved ✓');
+    return;
+  }
+
+  // Auto-search (no override)
+  r.status = 'Running\u2026';
+  applyFilters();
+  log('b', `Re-running sustainability search: ${r.company}`);
+  try {
+    if (aiEnabled()) {
+      log('b', `  🧠 AI finding sustainability page on ${r.website}...`);
+      const aiResult = await aiFindSusPage(r.website, r.company);
+      if (aiResult) r.sustainability_url = aiResult.url;
+    }
+    if (!r.sustainability_url) {
+      r.sustainability_url = await findSusUrl(r.website, r.company);
+    }
+    if (r.sustainability_url) {
+      r.status = 'Success';
+      if (!r.transition_plan_url) r.transition_plan_url = await findReportUrl(r.website, r.company);
+      const _nzR = await findNetZeroTarget(r.company); if (_nzR) { r.net_zero_target_year = _nzR.year; r.net_zero_source = _nzR.source; r.net_zero_source_url = _nzR.source_url || null; }
+      const [sbtiRes, cdpRes, smeRes] = await Promise.all([
+        checkSBTi(r.company).catch(()=>null),
+        checkCDP(r.company).catch(()=>null),
+        checkSMEHub(r.company).catch(()=>null),
+      ]);
+      if (sbtiRes) { r.sbti_near_term_status = sbtiRes.sbti_near_term_status; r.sbti_net_zero_status = sbtiRes.sbti_net_zero_status; r.sbti_temperature = sbtiRes.sbti_temperature; }
+      if (cdpRes) r.cdp_score = cdpRes.cdp_score;
+      if (smeRes) { r.sme_hub_member = smeRes.sme_hub_member; r.sme_hub_url = smeRes.sme_hub_url; }
+    } else {
+      r.status = 'Sustainability page not found';
+    }
+    r.maturity_score = calcMaturity(r);
+    dbMerge(r);
+  } catch(e) { log('r', e.message); }
+
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+}
+
+function triggerSusRerun(idx) {
+  const inp = document.getElementById('sri_'+idx);
+  reRunSusPage(idx, inp?.value.trim()||null);
+}
+function triggerSusRerunPanel(idx) {
+  const inp = document.getElementById('psri_'+idx);
+  reRunSusPage(idx, inp?.value.trim()||null);
+}
+
+async function reRunDoc(idx, urlOverride) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  if (urlOverride) {
+    const conf = scoreDocumentRelevance(urlOverride, getDocTitle(urlOverride));
+    if (!conf) { toast('URL does not look like a document — paste a PDF or report link'); return; }
+    r.transition_plan_url   = urlOverride;
+    r.transition_plan_title = getDocTitle(urlOverride);
+    r.doc_confidence        = conf;
+  } else {
+    const planResult = await findReportUrl(r.website||'', r.company);
+    r.transition_plan_url   = planResult?.url || null;
+    r.transition_plan_title = planResult?.title || (planResult?.url ? getDocTitle(planResult.url) : null);
+    r.doc_confidence        = planResult?.doc_confidence || null;
+  }
+  r.maturity_score = calcMaturity(r);
+  dbMerge(r);
+  applyFilters(); updateStats(allResults);
+  if (document.getElementById('overlay').classList.contains('open') &&
+      document.getElementById('pName').textContent === r.company) openPanel(r);
+  toast('Document updated');
+}
+function triggerDocRerun(idx) {
+  const inp = document.getElementById('dri_'+idx);
+  reRunDoc(idx, inp?.value.trim()||null);
+}
+function triggerDocRerunPanel(idx) {
+  const inp = document.getElementById('pdri_'+idx);
+  reRunDoc(idx, inp?.value.trim()||null);
+}
+
+// ── Run engine ────────────────────────────────────────────────────────────────
+async function startRun() {
+  if (isRunning || !allResults.length) return;
+
+  // Warn if AI is not configured
+  if (!aiConfig.apiKey) {
+    showAiWarning();
+    return;
+  }
+
+  isRunning = true; cancelFlag = false;
+  document.getElementById('btnRun').style.display    = 'none';
+  document.getElementById('btnCancel').style.display = 'inline-block';
+  document.getElementById('progWrap').style.display  = 'block';
+  document.getElementById('logWrap').style.display   = 'block';
+  document.getElementById('logLines').innerHTML      = '';
+
+  const pending = allResults.filter(r => r.status !== 'Success');
+  const workers = parseInt(document.getElementById('workers').value)||3;
+  const delay   = parseFloat(document.getElementById('delay').value)||1;
+  let done = 0;
+  const startTime = Date.now();
+
+  function updateProg() {
+    const pct = pending.length ? Math.round(done/pending.length*100) : 100;
+    document.getElementById('progFill').style.width = pct+'%';
+    const elapsed = (Date.now()-startTime)/1000;
+    const rate = done ? elapsed/done : 0;
+    const remaining = rate ? Math.round((pending.length-done)*rate) : '?';
+    document.getElementById('progTitle').textContent = `${done}/${pending.length} companies processed`;
+    document.getElementById('progEta').textContent   = done && remaining !== '?' ? `~${remaining}s remaining` : '';
+  }
+
+  let queueIdx = 0;
+  async function worker() {
+    while (queueIdx < pending.length && !cancelFlag) {
+      const i = queueIdx++;
+      const r = pending[i];
+      log('b', `Processing: ${r.company} (${i+1}/${pending.length})`);
+      r.status = 'Running\u2026';
+      applyFilters();
+      try {
+        const result = await processOne({ 'Company Name': r.company, Website: r.website||'' });
+        if (result) {
+          result._idx = r._idx;
+          Object.assign(r, result);
+          dbMerge(r);
+          saveResultToDb(r).catch(()=>{}); // persist to Supabase
+        }
+      } catch(e) {
+        r.status = 'Website not found';
+        log('r', `Error ${r.company}: ${e.message}`);
+      }
+      done++;
+      updateProg();
+      applyFilters(); updateStats(allResults);
+      if (i < pending.length-1) await new Promise(res => setTimeout(res, delay*1000));
+    }
+  }
+
+  await Promise.all(Array.from({length: workers}, () => worker()));
+
+  isRunning = false;
+  document.getElementById('btnRun').style.display    = 'inline-block';
+  document.getElementById('btnCancel').style.display = 'none';
+  setTimeout(() => { document.getElementById('progWrap').style.display = 'none'; }, 3000);
+  // Auto-collapse the log after run so results are visible
+  setTimeout(() => {
+    const body = document.getElementById('logLines')?.parentElement;
+    const arrow = document.getElementById('logToggleArrow');
+    if (body && !body.classList.contains('collapsed')) {
+      body.classList.add('collapsed');
+      if (arrow) arrow.classList.add('collapsed');
+    }
+  }, 1500);
+  toast(cancelFlag ? 'Analysis cancelled' : 'Analysis complete!', 3500);
+}
+
+function cancelRun() {
+  cancelFlag = true;
+  toast('Cancelling after current batch...');
+}
+
+// ── CSV/Excel parsing ──────────────────────────────────────────────────────────
+async function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv') {
+    const text = await file.text();
+    parseAndLoad(text.split(/\r?\n/).map(l => l.split(',')));
+  } else {
+    const buf = await file.arrayBuffer();
+    parseXlsx(buf);
+  }
+}
+
+function parseXlsx(buf) {
+  // Simple XLSX reader using SheetJS if available, else fallback
+  if (typeof XLSX !== 'undefined') {
+    const wb = XLSX.read(buf, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    loadRows(rows);
+  } else {
+    toast('XLSX parsing not available — please use CSV');
+  }
+}
+
+function parseAndLoad(rows) {
+  if (rows.length < 2) { toast('File appears empty'); return; }
+  const headers = rows[0].map(h => String(h).trim());
+  const data = rows.slice(1).filter(r => r.some(c => c)).map(row => {
+    const obj = {};
+    headers.forEach((h,i) => { obj[h] = String(row[i]||'').trim(); });
+    return obj;
+  });
+  loadRows(data);
+}
+
+function loadRows(rows) {
+  // Map CSV header names (as exported) back to internal field names
+  const CSV_COL_MAP = {
+    'Company Name':           'company',
+    'Website':                'website',
+    'Sustainability URL':     'sustainability_url',
+    'Transition Plan URL':    'transition_plan_url',
+    'Transition Plan Title':  'transition_plan_title',
+    'Doc Confidence':         'doc_confidence',
+    'Net Zero Year':          'net_zero_target_year',
+    'Net Zero Source':        'net_zero_source',
+    'Net Zero Source URL':    'net_zero_source_url',
+    'SBTi Near Term':         'sbti_near_term_status',
+    'SBTi Net Zero':          'sbti_net_zero_status',
+    'SBTi Temperature':       'sbti_temperature',
+    'CDP Score':              'cdp_score',
+    'SME Hub':                'sme_hub_member',
+    'Maturity Score':         'maturity_score',
+    'Confidence':             'confidence',
+    'Last Run':               'extraction_date',
+    'Summary':                'sustainability_summary',
+    'Certifications':         'certifications',
+    'Emissions Reduction':    'emissions_reduction_target',
+    'Carbon Data':            'carbon_data',
+    'Key Initiatives':        'key_initiatives',
+    // Also accept internal field names directly (re-import of raw export)
+    'company':'company','website':'website','sustainability_url':'sustainability_url',
+    'transition_plan_url':'transition_plan_url','transition_plan_title':'transition_plan_title',
+    'doc_confidence':'doc_confidence','net_zero_target_year':'net_zero_target_year',
+    'net_zero_source':'net_zero_source','net_zero_source_url':'net_zero_source_url',
+    'sbti_near_term_status':'sbti_near_term_status','sbti_net_zero_status':'sbti_net_zero_status',
+    'sbti_temperature':'sbti_temperature','cdp_score':'cdp_score','sme_hub_member':'sme_hub_member',
+    'sme_hub_url':'sme_hub_url',
+    'maturity_score':'maturity_score','confidence':'confidence','confidence_reasons':'confidence_reasons',
+    'extraction_date':'extraction_date',
+    'sustainability_summary':'sustainability_summary','certifications':'certifications',
+    'emissions_reduction_target':'emissions_reduction_target','carbon_data':'carbon_data',
+    'key_initiatives':'key_initiatives',
+  };
+
+  allResults = rows
+    .filter(r => (r['Company Name']||r['company']||'').trim())
+    .map((r, i) => {
+      // Remap all CSV columns to internal field names
+      const mapped = {};
+      for (const [csvCol, field] of Object.entries(CSV_COL_MAP)) {
+        if (r[csvCol] !== undefined && r[csvCol] !== '') mapped[field] = String(r[csvCol]).trim();
+      }
+      const company = mapped.company || '';
+      if (!company) return null;
+      const existing = dbGet(company);
+      const base = {
+        ...( existing || {} ),
+        ...mapped,
+        company,
+        website: (mapped.website||existing?.website||'').replace(/^https?:\/\//,'').replace(/\/$/,'').trim(),
+        status: mapped.status || existing?.status || (mapped.sustainability_url ? 'Success' : 'Pending'),
+        _idx: i,
+      };
+      base._idx = i;
+      // Parse maturity_score as number if it came in as a string
+      if (base.maturity_score) base.maturity_score = Number(base.maturity_score) || calcMaturity(base);
+      else base.maturity_score = calcMaturity(base);
+      // Parse confidence_reasons back from JSON if it was serialised as an array
+      if (base.confidence_reasons && typeof base.confidence_reasons === 'string') {
+        try { base.confidence_reasons = JSON.parse(base.confidence_reasons); } catch { base.confidence_reasons = []; }
+      }
+      _rByIdx[i] = base;
+      return base;
+    }).filter(Boolean);
+
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('statsBar').style.display     = 'flex';
+  document.getElementById('toolbar').style.display      = 'flex';
+  document.getElementById('btnRun').style.display       = 'inline-block';
+  document.getElementById('btnClear').style.display     = 'inline-block';
+  document.getElementById('cfgBar').style.display       = 'flex';
+  setView('table');
+  applyFilters();
+  updateStats(allResults);
+  toast(`Loaded ${allResults.length} companies`);
+}
+
+function loadDemo() {
+  const demo = [
+    {'Company Name':'Unilever','Website':'unilever.com'},
+    {'Company Name':'BT Group'},
+    {'Company Name':'Tesco'},
+    {'Company Name':'HSBC'},
+    {'Company Name':'Rolls-Royce Holdings'},
+    {'Company Name':'Barratt Developments'},
+    {'Company Name':'SSE plc'},
+    {'Company Name':'Severn Trent'},
+  ];
+  loadRows(demo);
+}
+
+function clearAll() {
+  allResults = []; filteredResults = []; _rByIdx = {};
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('statsBar').style.display     = 'none';
+  document.getElementById('toolbar').style.display      = 'none';
+  document.getElementById('btnClear').style.display     = 'none';
+  document.getElementById('cfgBar').style.display       = 'none';
+  document.getElementById('tableView').style.display    = 'none';
+  document.getElementById('cardsView').style.display    = 'none';
+  document.getElementById('tBody').innerHTML = '';
+  document.getElementById('logWrap').style.display      = 'none';
+}
+
+// ── Sorting ────────────────────────────────────────────────────────────────────
+function colSortBy(key) {
+  if (currentSort.key === key) {
+    currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSort.key = key;
+    currentSort.dir = 'asc';
+  }
+  ['name','status','suspage','nz','summary','certs','maturity','reason','date','doc','confidence'].forEach(k => {
+    const el = document.getElementById('sa-'+k);
+    if (el) el.className = 'sort-arrow' + (k===key ? ' '+currentSort.dir : '');
+  });
+  applyFilters();
+}
+
+function sortResults(data) {
+  const { key, dir } = currentSort;
+  const flip = dir === 'asc' ? 1 : -1;
+  const confRank = { High: 3, Medium: 2, Low: 1, '': 0 };
+  return [...data].sort((a,b) => {
+    switch(key) {
+      case 'name':     return flip*(a.company||'').localeCompare(b.company||'');
+      case 'status':   return flip*(a.status||'').localeCompare(b.status||'');
+      case 'suspage':  return flip*((a.sustainability_url?1:0)-(b.sustainability_url?1:0));
+      case 'nz':       return flip*((a.net_zero_target_year||9999)-(b.net_zero_target_year||9999));
+      case 'summary':  return flip*(a.sustainability_summary||'').localeCompare(b.sustainability_summary||'');
+      case 'certs':    return flip*((a.certifications?1:0)-(b.certifications?1:0));
+      case 'maturity': return flip*((a.maturity_score??0)-(b.maturity_score??0));
+      case 'reason': {
+        const ga = calcMaturity(a), gb = calcMaturity(b);
+        return flip*(ga-gb);
+      }
+      case 'date':       return flip*(a.extraction_date||'').localeCompare(b.extraction_date||'');
+      case 'doc':        return flip*((a.transition_plan_url?1:0)-(b.transition_plan_url?1:0));
+      case 'confidence': return flip*((confRank[a.confidence]||0)-(confRank[b.confidence]||0));
+      default:           return 0;
+    }
+  });
+}
+
+// ── Filters ─────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const q     = (document.getElementById('fSearch')?.value||'').toLowerCase();
+  const fSt   = document.getElementById('fStatus')?.value||'';
+  const fNZ   = document.getElementById('fNZ')?.value||'';
+  const fConf = document.getElementById('fConf')?.value||'';
+  const fDoc  = document.getElementById('fDoc')?.value||'';
+
+  filteredResults = allResults.filter(r => {
+    if (fSt && r.status !== fSt) return false;
+    if (fNZ === 'has_nz' && !r.net_zero_target_year) return false;
+    if (fNZ === 'no_nz'  &&  r.net_zero_target_year) return false;
+    if (fConf && r.confidence !== fConf) return false;
+    if (fDoc === 'has_doc' && !r.transition_plan_url) return false;
+    if (fDoc === 'no_doc'  &&  r.transition_plan_url) return false;
+    if (q) {
+      const fields = [
+        r.company, r.website, r.sustainability_summary,
+        r.certifications, r.net_zero_target_year,
+        r.net_zero_source, r.transition_plan_title,
+      ].map(f => (f||'').toLowerCase());
+      if (!fields.some(f => f.includes(q))) return false;
+    }
+    return true;
+  });
+
+  filteredResults = sortResults(filteredResults);
+
+  document.getElementById('pageInfo').textContent = `${filteredResults.length} companies`;
+
+  if (currentView === 'table') renderTable(filteredResults);
+  else renderCards(filteredResults);
+}
+
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+function sBadge(status) {
+  if (!status || status === 'Pending') return '<span class="badge b-dim">Pending</span>';
+  if (status === 'Success') return '<span class="badge b-ok">&#x2713; Success</span>';
+  if (status.includes('Running')) return '<span class="badge b-warn">&#x23F3; Running</span>';
+  return `<span class="badge b-err" title="${status}">&#x2715; ${status.replace('Website not found','No website').replace('Sustainability page not found','No sus page')}</span>`;
+}
+
+function cBadge(c, reasons) {
+  if (!c) return '<span class="td-na">&#x2014;</span>';
+  const map = { High:'b-ok', Medium:'b-warn', Low:'b-err' };
+  const tip = reasons && reasons.length
+    ? ' title="' + reasons.join('\n').replace(/"/g,'&quot;') + '"'
+    : '';
+  return `<span class="badge ${map[c]||'b-dim'}"${tip}>${c}</span>`;
+}
+
+function confidenceCell(r) {
+  if (!r.confidence) return '<span class="td-na">&#x2014;</span>';
+  const map = { High:'b-ok', Medium:'b-warn', Low:'b-err' };
+  const reasons = r.confidence_reasons || [];
+  const reasonsHtml = reasons.length
+    ? '<div style="margin-top:3px;display:flex;flex-direction:column;gap:1px;">' +
+      reasons.map(rr => {
+        const isPos = rr.startsWith('\u2713');
+        const col = isPos ? 'var(--green)' : 'var(--amber,#f59e0b)';
+        return '<span style="font-size:.6rem;color:' + col + ';line-height:1.3;">' + rr + '</span>';
+      }).join('') + '</div>'
+    : '';
+  return '<div><span class="badge ' + (map[r.confidence]||'b-dim') + '">' + r.confidence + '</span>' + reasonsHtml + '</div>';
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('tBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.className = 'fade-in';
+
+    const susLink = r.sustainability_url
+      ? `<a href="${r.sustainability_url}" target="_blank" rel="noopener" class="td-link" onclick="event.stopPropagation()"
+           style="display:block;word-break:break-all;white-space:normal;max-width:220px;font-size:.65rem;"
+           title="${r.sustainability_url}">&#x1F517; ${r.sustainability_url}</a>
+         <button onclick="event.stopPropagation();rejectSusPage(${r._idx})" title="Remove sustainability page"
+           style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.65rem;padding:0;margin-top:1px;"
+           onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715; remove</button>`
+      : '<span class="td-na">&#x2014;</span>';
+
+    const noSusPage = r.website && r.status === 'Sustainability page not found';
+
+    const score = r.maturity_score ?? calcMaturity(r);
+    const hasValidPlan = r.transition_plan_url && isValidTransitionPlan(r.transition_plan_url, r.transition_plan_title||'');
+    const sbtiVerified = r.sbti_net_zero_status === 'Targets set' || r.sbti_near_term_status === 'Targets set';
+    const achText = [r.sustainability_summary,r.emissions_reduction_target].filter(Boolean).join(' ').toLowerCase();
+    const nzAchieved = /(net.?zero achieved|achieved net.?zero|we are net.?zero)/.test(achText);
+    const cneutral  = /(carbon.?neutral|climate positive|carbon negative)/.test(achText);
+    const { label: mLabel, color: mColor } = maturityLabel(score);
+    const narrativeText = maturityNarrative(r, score, mLabel, hasValidPlan, sbtiVerified, nzAchieved, cneutral);
+
+    const safeNarrative = narrativeText
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/`/g,'&#96;').replace(/\$/g,'&#36;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const summaryText = r.sustainability_summary || r.key_initiatives || '';
+    const safeSummary = summaryText
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/`/g,'&#96;').replace(/\$/g,'&#36;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const planCell = r.transition_plan_url
+      ? (() => {
+          const conf = r.doc_confidence || 'low';
+          const confColor = conf === 'high' ? 'var(--green)' : conf === 'medium' ? 'var(--amber)' : 'var(--text3)';
+          const confBg   = conf === 'high' ? 'rgba(74,222,128,.1)' : conf === 'medium' ? 'rgba(251,191,36,.1)' : 'rgba(255,255,255,.04)';
+          const confBorder = conf === 'high' ? 'rgba(74,222,128,.25)' : conf === 'medium' ? 'rgba(251,191,36,.25)' : 'var(--border2)';
+          const docName = (r.transition_plan_title || r.transition_plan_url.split('/').pop().replace(/\.pdf$/i,'') || 'View doc')
+            .replace(/[-_]/g,' ').trim();
+          return `<div style="display:flex;flex-direction:column;gap:3px;">
+            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;font-size:.6rem;font-family:var(--mono);font-weight:600;background:${confBg};color:${confColor};border:1px solid ${confBorder};width:fit-content;">${conf.toUpperCase()}</span>
+            <a href="${r.transition_plan_url}" target="_blank" rel="noopener" class="td-link" onclick="event.stopPropagation()"
+               title="${r.transition_plan_url}" style="font-size:.65rem;word-break:break-all;white-space:normal;max-width:180px;">&#x1F4C4; ${docName.slice(0,32)}${docName.length > 32 ? '…' : ''}</a>
+            <button onclick="event.stopPropagation();rejectPlan(${r._idx})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.65rem;padding:0;"
+              onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715; remove</button>
+          </div>`;
+        })()
+      : '<span class="td-na">&#x2014;</span>';
+
+    const nzCell = (() => {
+      const idx = r._idx;
+      if (r.net_zero_target_year) {
+        const src = r.net_zero_source
+          || (r.sustainability_url ? (() => { try { return new URL(r.sustainability_url).hostname.replace('www.',''); } catch { return null; } })() : null)
+          || 'web search';
+        const srcUrl = r.net_zero_source_url || r.sustainability_url || null;
+        const srcDisplay = srcUrl
+          ? `<a href="${srcUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:.58rem;color:var(--sky);text-decoration:none;overflow:hidden;text-overflow:ellipsis;max-width:120px;display:block;" title="${srcUrl}">&#x2197; ${src}</a>`
+          : `<div style="font-size:.58rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;max-width:120px;" title="${src}">via ${src}</div>`;
+        return '<div style="display:flex;flex-direction:column;gap:1px;">'
+          + '<div style="display:flex;align-items:center;gap:3px;">'
+          + `<span style="font-family:var(--mono);font-weight:600;">${r.net_zero_target_year}</span>`
+          + `<button onclick="rejectNetZeroTarget(${idx})" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.7rem;padding:0 0 0 2px;line-height:1;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715;</button>`
+          + '</div>'
+          + srcDisplay
+          + '</div>';
+      }
+      const gUrl = nzSearchUrl(r.company||'', r.website);
+      const notFound = r.sustainability_url && r.status === 'Success';
+      return `<div style="display:flex;flex-direction:column;gap:3px;">`
+        + (notFound ? `<span style="font-family:var(--mono);font-size:.65rem;color:var(--text3);font-style:italic;">No target found</span>` : '')
+        + `<a href="${gUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;">&#x1F50D; Search</a>`
+        + `<div class="rerun-wrap">`
+        + `<input class="rerun-input" id="nzi_${idx}" placeholder="e.g. 2035" style="width:65px;font-size:.6rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();setNetZeroTarget(${idx},this.value)}" onclick="event.stopPropagation()">`
+        + `<button class="rerun-btn" onclick="event.stopPropagation();setNetZeroTarget(${idx},document.getElementById('nzi_${idx}').value)" title="Set year">&#x2713;</button>`
+        + `</div></div>`;
+    })();
+
+    const websiteHtml = (() => {
+      const idx = r._idx;
+      if (r.website) {
+        return `<a href="https://${r.website}" target="_blank" style="color:var(--sky);text-decoration:none;">${r.website}</a>`
+          + `<button onclick="event.stopPropagation();rejectWebsite(${idx})" title="Wrong site" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.65rem;padding:0 0 0 4px;line-height:1;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715;</button>`;
+      }
+      return '';
+    })();
+
+    tr.innerHTML = `
+      <td onclick="event.stopPropagation()">
+        <div class="td-co" title="${r.company}" style="cursor:pointer;" onclick="openPanel(_rByIdx[${r._idx}])">${r.company||'&#x2014;'}</div>
+        <div class="td-sub">${websiteHtml}</div>
+        ${r.status !== 'Running…' ? `
+        <div class="rerun-wrap">
+          <input class="rerun-input" id="ri_${r._idx}" placeholder="${r.website ? 'enter new website…' : 'enter website…'}"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}"
+            onclick="event.stopPropagation()">
+          <button class="rerun-btn" id="rb_${r._idx}" onclick="event.stopPropagation();triggerRerun(${r._idx})">&#x21BA;</button>
+        </div>` : `<div style="font-family:var(--mono);font-size:.63rem;color:var(--text3);margin-top:3px;">&#x23F3; running…</div>`}
+      </td>
+      <td onclick="event.stopPropagation()">
+        ${sBadge(r.status)}
+        ${r.status === 'Website not found' ? `
+        <div style="display:flex;flex-direction:column;gap:3px;margin-top:5px;">
+          <a href="https://www.google.com/search?q=${encodeURIComponent(r.company+' official website')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;">&#x1F50D; Find website</a>
+          <div class="rerun-wrap">
+            <input class="rerun-input" id="wsi_${r._idx}" placeholder="paste URL…" style="width:90px;font-size:.6rem;"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value.trim();if(v){const inp=document.getElementById('ri_${r._idx}');if(inp)inp.value=v;triggerRerun(${r._idx})}}"
+              onclick="event.stopPropagation()">
+            <button class="rerun-btn" onclick="event.stopPropagation();const v=document.getElementById('wsi_${r._idx}').value.trim();if(v){const inp=document.getElementById('ri_${r._idx}');if(inp)inp.value=v;triggerRerun(${r._idx})}">&#x21BA;</button>
+          </div>
+        </div>` : ''}
+        ${r.status === 'Sustainability page not found' ? `
+        <div style="display:flex;flex-direction:column;gap:3px;margin-top:5px;" onclick="event.stopPropagation()">
+          <a href="${susSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;">&#x1F50D; Find sus page</a>
+          <div class="rerun-wrap">
+            <input class="rerun-input" id="sri_${r._idx}" placeholder="paste URL…" style="width:90px;font-size:.6rem;"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();triggerSusRerun(${r._idx})}"
+              onclick="event.stopPropagation()">
+            <button class="rerun-btn" id="srb_${r._idx}" onclick="event.stopPropagation();triggerSusRerun(${r._idx})">&#x21BA;</button>
+          </div>
+        </div>` : ''}
+      </td>
+      <td>${susLink}</td>
+      <td class="td-mono" onclick="event.stopPropagation()">${nzCell}</td>
+      <td>${summaryText ? `<span class="td-summary" title="${safeSummary}">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : '<span class="td-na">&#x2014;</span>'}</td>
+      <td class="td-mono" style="font-size:.72rem;color:var(--text2);max-width:180px;">${r.certifications ? r.certifications.replace(/</g,'&lt;') : '<span class="td-na">&#x2014;</span>'}</td>
+      <td><span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
+          <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span></td>
+      <td><span class="td-summary" title="${safeNarrative}">${narrativeText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></td>
+      <td class="td-mono" style="font-size:.7rem;color:var(--text3);">${r.extraction_date||'&#x2014;'}</td>
+      <td onclick="event.stopPropagation()">${planCell}</td>
+      <td style="min-width:120px;">${confidenceCell(r)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCards(data) {
+  const grid = document.getElementById('cardGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  data.forEach(r => {
+    const score = r.maturity_score ?? calcMaturity(r);
+    const { label: mLabel, color: mColor } = maturityLabel(score);
+    const c = document.createElement('div');
+    c.className = 'card fade-in';
+    c.onclick = () => openPanel(r);
+    c.innerHTML = `<div class="card-name" title="${r.company}">${r.company}</div>
+      <div class="card-meta">
+        ${sBadge(r.status)}
+        ${r.net_zero_target_year ? `<span class="badge b-ok">NZ ${r.net_zero_target_year}</span>` : ''}
+        ${r.sbti_net_zero_status ? '<span class="badge" style="background:rgba(167,139,250,.1);color:var(--violet);border:1px solid rgba(167,139,250,.2);">SBTi</span>' : ''}
+        ${r.sme_hub_member ? '<span class="badge b-ok">&#x1F331; SME Hub</span>' : ''}
+      </div>
+      ${r.website ? `<div style="font-family:var(--mono);font-size:.65rem;color:var(--text3);margin-bottom:.3rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.website}</div>` : ''}
+      <div class="card-mat">
+        <div class="card-mat-l">Maturity</div>
+        <div class="card-mat-v" style="color:${mColor}">${score}/20 <span style="font-size:.65rem;opacity:.8;">${mLabel}</span></div>
+      </div>`;
+    grid.appendChild(c);
+  });
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+function updateStats(data) {
+  const ok   = data.filter(r => r.status==='Success').length;
+  const nz   = data.filter(r => r.net_zero_target_year).length;
+  const sbti = data.filter(r => r.sbti_near_term_status==='Targets set'||r.sbti_net_zero_status==='Targets set').length;
+  const mats = data.map(r => r.maturity_score ?? calcMaturity(r));
+  const avg  = mats.length ? (mats.reduce((a,b)=>a+b,0)/mats.length).toFixed(1) : '&#x2014;';
+  document.getElementById('sTotal').textContent  = data.length;
+  document.getElementById('sOK').textContent     = ok;
+  document.getElementById('sNZ').textContent     = nz;
+  document.getElementById('sSBTi').textContent   = sbti;
+  document.getElementById('sAvgMat').innerHTML   = avg;
+}
+
+// ── Detail panel ───────────────────────────────────────────────────────────────
+function openPanel(r) {
+  if (!r) return;
+  document.getElementById('pName').textContent = r.company||'&#x2014;';
+
+  // Website display with reject button
+  const pWebEl = document.getElementById('pWebsite');
+  if (r.website) {
+    pWebEl.innerHTML = `<a href="https://${r.website}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;">${r.website}</a>`
+      + ` <button onclick="rejectWebsite(${r._idx})" style="background:none;border:1px solid rgba(248,113,113,.3);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.65rem;padding:1px 7px;margin-left:6px;" onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.3)'">&#x2715; Wrong site</button>`;
+  } else {
+    pWebEl.innerHTML = '<span style="color:var(--amber);font-family:var(--mono);font-size:.7rem;">&#x26A0; No website found</span>';
+  }
+
+  // Sustainability URL
+  const url = r.sustainability_url || '';
+  document.getElementById('pUrl').innerHTML = url
+    ? `<a href="${url}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;">${url}</a>`
+      + ` <button onclick="rejectSusPage(${r._idx})" style="background:none;border:1px solid rgba(248,113,113,.3);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.65rem;padding:1px 7px;margin-left:8px;" onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.3)'">&#x2715; Reject page</button>`
+    : `<span style="color:var(--amber);font-family:var(--mono);font-size:.7rem;">&#x26A0; ${r.status||'No data found'}</span>`;
+
+  // Rerun panel
+  const pRerun = document.getElementById('pRerun');
+  const noWebsite = !r.website || r.status === 'Website not found';
+  const noSusPage = r.website && r.status === 'Sustainability page not found';
+
+  if (r.status === 'Running…') {
+    pRerun.innerHTML = '<div style="font-family:var(--mono);font-size:.7rem;color:var(--text3);">&#x23F3; Running…</div>';
+    pRerun.style.display = 'block';
+  } else if (noWebsite) {
+    pRerun.innerHTML = `<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-family:var(--mono);font-size:.63rem;color:var(--amber);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em;">&#x26A0; No website found</div>
+      <div class="rerun-wrap">
+        <input class="rerun-input" id="pri_${r._idx}" placeholder="e.g. bt.com"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerunPanel(${r._idx})}">
+        <button class="rerun-btn" onclick="triggerRerunPanel(${r._idx})">&#x21BA; Re-search</button>
+      </div></div>`;
+    pRerun.style.display = 'block';
+  } else if (noSusPage) {
+    pRerun.innerHTML = `<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-family:var(--mono);font-size:.63rem;color:var(--amber);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em;">&#x26A0; No sustainability page found</div>
+      <a href="${susSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" style="display:inline-block;font-size:.7rem;color:var(--amber);text-decoration:none;margin-bottom:6px;">&#x1F50D; Search Google &#x2197;</a>
+      <div class="rerun-wrap">
+        <input class="rerun-input" id="psri_${r._idx}" placeholder="paste sustainability URL…"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();triggerSusRerunPanel(${r._idx})}">
+        <button class="rerun-btn" onclick="triggerSusRerunPanel(${r._idx})">&#x21BA; Re-search</button>
+      </div></div>`;
+    pRerun.style.display = 'block';
+  } else {
+    // Website confirmed — always show re-search option
+    pRerun.innerHTML = `<div style="background:rgba(255,255,255,.02);border:1px solid var(--border2);border-radius:8px;padding:.6rem 1rem;">
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--text3);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.06em;">Re-search with different website</div>
+      <div class="rerun-wrap">
+        <input class="rerun-input" id="pri_${r._idx}" placeholder="e.g. bt.com"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerunPanel(${r._idx})}">
+        <button class="rerun-btn" onclick="triggerRerunPanel(${r._idx})">&#x21BA; Re-search</button>
+      </div></div>`;
+    pRerun.style.display = 'block';
+  }
+
+  // Plan field
+  const tplanHtml = r.transition_plan_url
+    ? (() => {
+        const conf = r.doc_confidence || 'low';
+        const confColor  = conf === 'high' ? 'var(--green)' : conf === 'medium' ? 'var(--amber)' : 'var(--text3)';
+        const confBg     = conf === 'high' ? 'rgba(74,222,128,.1)' : conf === 'medium' ? 'rgba(251,191,36,.1)' : 'rgba(255,255,255,.04)';
+        const confBorder = conf === 'high' ? 'rgba(74,222,128,.25)' : conf === 'medium' ? 'rgba(251,191,36,.25)' : 'var(--border2)';
+        const confLabel  = conf === 'high' ? 'High relevance' : conf === 'medium' ? 'Medium relevance — may contain sustainability section' : 'Low relevance — verify manually';
+        return `<div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:.63rem;font-family:var(--mono);font-weight:600;background:${confBg};color:${confColor};border:1px solid ${confBorder};width:fit-content;" title="${confLabel}">${conf.toUpperCase()} confidence</span>
+          <a href="${r.transition_plan_url}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;">&#x1F4C4; ${r.transition_plan_title||r.transition_plan_url.split('/').pop().replace(/\.pdf$/i,'')||'View document'}</a>
+          <span style="font-size:.63rem;color:var(--text3);">(<a href="${docSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" style="color:var(--text3);">find another &#x2197;</a>)</span>
+          <button onclick="rejectPlan(${r._idx})" style="background:none;border:1px solid rgba(248,113,113,.3);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.65rem;padding:1px 7px;width:fit-content;" onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.3)'">&#x2715; Reject doc</button>
+        </div>`;
+      })()
+    : `<div style="margin-top:4px;">
+         <a href="${docSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" style="display:inline-block;font-size:.7rem;color:var(--amber);text-decoration:none;margin-bottom:6px;">&#x1F50D; Search Google for carbon reduction plan &#x2197;</a>
+         <div class="rerun-wrap">
+           <input class="rerun-input" id="pdri_${r._idx}" placeholder="paste document URL…"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();triggerDocRerunPanel(${r._idx})}">
+           <button class="rerun-btn" onclick="triggerDocRerunPanel(${r._idx})">&#x21BA; Re-search</button>
+         </div></div>`;
+
+  const sbtiDisplay = (r.sbti_near_term_status||r.sbti_net_zero_status)
+    ? `${r.sbti_net_zero_status||r.sbti_near_term_status}${r.sbti_temperature?' &middot; '+r.sbti_temperature:''}`
+    : null;
+  const cdpDisplay  = r.cdp_score
+    ? `${r.cdp_score} &#x2014; <a href="https://www.cdp.net/en/data/scores" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;">View on CDP &#x2197;</a>`
+    : null;
+  const smeDisplay  = r.sme_hub_member
+    ? `<a href="${r.sme_hub_url||'https://smeclimatehub.org/smes/'}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;">&#x1F331; SME Climate Hub Member &#x2014; Race to Zero &#x2197;</a>`
+    : null;
+
+  const score = r.maturity_score ?? calcMaturity(r);
+  const { label: mLabel, color: mColor } = maturityLabel(score);
+  const hasValidPlan = r.transition_plan_url && isValidTransitionPlan(r.transition_plan_url, r.transition_plan_title||'');
+  const sbtiVerified = r.sbti_net_zero_status === 'Targets set' || r.sbti_near_term_status === 'Targets set';
+  const achText = [r.sustainability_summary,r.emissions_reduction_target].filter(Boolean).join(' ').toLowerCase();
+  const nzAchieved = /(net.?zero achieved|achieved net.?zero)/.test(achText);
+  const cneutral = /(carbon.?neutral|climate positive|carbon negative)/.test(achText);
+  const narrative = maturityNarrative(r, score, mLabel, hasValidPlan, sbtiVerified, nzAchieved, cneutral);
+
+  const maturityDisplay = (() => {
+    const hasNZ      = !!r.net_zero_target_year;
+    const hasPlan    = !!r.transition_plan_url;
+    const hasCO2     = !!(r.carbon_data && r.carbon_data.trim().length > 0);
+    const hasSusPage = !!r.sustainability_url;
+
+    // Determine which base tier was reached
+    let baseTier = 0;
+    if (!hasSusPage)   baseTier = 0;
+    else if (hasNZ)    baseTier = 3;
+    else if (hasCO2)   baseTier = 2;
+    else               baseTier = 1;
+
+    const tiers = [
+      { label: 'Sustainability page', base: 1,  reached: hasSusPage, detail: r.sustainability_url ? 'Dedicated page found' : 'No sustainability page found' },
+      { label: 'Carbon data',         base: 4,  reached: hasSusPage && hasCO2 && !hasNZ, detail: r.carbon_data || 'No explicit Scope 1/2/3 data extracted' },
+      { label: 'Net zero target',     base: 12, reached: hasSusPage && hasNZ, detail: hasNZ ? `Target year: ${r.net_zero_target_year}` : 'No net zero target found' },
+    ];
+
+    const bonuses = [
+      { label: 'Sustainability document', pts: r.doc_confidence === 'high' ? 2 : r.doc_confidence === 'medium' ? 1 : 0, earned: !!r.transition_plan_url && (r.doc_confidence === 'high' || r.doc_confidence === 'medium'), detail: r.transition_plan_url ? `${(r.doc_confidence||'low').toUpperCase()} confidence — ${r.transition_plan_title || 'document found'}` : 'No document found' },
+      { label: 'SBTi near-term targets',   pts: 2, earned: r.sbti_near_term_status === 'Targets set', detail: r.sbti_near_term_status || 'Not listed on SBTi' },
+      { label: 'SBTi net zero targets',    pts: 1, earned: r.sbti_net_zero_status  === 'Targets set', detail: r.sbti_net_zero_status  || 'Not listed on SBTi' },
+      { label: 'CDP disclosure',           pts: 1, earned: !!r.cdp_score,     detail: r.cdp_score ? `Score: ${r.cdp_score}` : 'No CDP score found' },
+      { label: 'SME Climate Hub',          pts: 1, earned: !!r.sme_hub_member, detail: r.sme_hub_member ? 'Race to Zero member' : 'Not a member' },
+      { label: 'Certifications',           pts: 1, earned: !!r.certifications, detail: r.certifications || 'No certifications extracted' },
+    ];
+
+    const tierRows = tiers.map((t, i) => {
+      const isReached   = t.reached;
+      const isNext      = !isReached && (i === 0 || tiers[i-1].reached);
+      const color = isReached ? 'var(--green)' : isNext ? 'var(--amber)' : 'var(--text3)';
+      const icon  = isReached ? '✓' : isNext ? '○' : '–';
+      const detailText  = typeof t.detail === 'string' ? t.detail : String(t.detail||'');
+      return `<div style="display:grid;grid-template-columns:16px 1fr auto;gap:4px 8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border1);">
+        <span style="font-size:.7rem;color:${color};font-weight:700;">${icon}</span>
+        <div>
+          <div style="font-size:.75rem;color:${isReached ? 'var(--text1)' : 'var(--text3)'};">${t.label}</div>
+          <div style="font-size:.65rem;color:var(--text3);margin-top:1px;line-height:1.3;">${detailText.slice(0,120)}</div>
+        </div>
+        <span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${color};white-space:nowrap;">${isReached ? `= ${t.base}` : `/${t.base}`}</span>
+      </div>`;
+    }).join('');
+
+    const bonusRows = bonuses.map(b => {
+      const color = b.earned ? 'var(--sky)' : 'var(--text3)';
+      return `<div style="display:grid;grid-template-columns:16px 1fr auto;gap:4px 8px;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border1);">
+        <span style="font-size:.65rem;color:${color};">${b.earned ? '+' : '–'}</span>
+        <div>
+          <div style="font-size:.72rem;color:${b.earned ? 'var(--text2)' : 'var(--text3)'};">${b.label}</div>
+          <div style="font-size:.63rem;color:var(--text3);margin-top:1px;">${b.detail}</div>
+        </div>
+        <span style="font-family:var(--mono);font-size:.68rem;color:${color};white-space:nowrap;">${b.earned ? `+${b.pts}` : `0/${b.pts}`}</span>
+      </div>`;
+    }).join('');
+
+    return `
+      <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+        <span style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor}">${score}/20</span>
+        <span style="font-family:var(--mono);font-size:.66rem;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.06);color:${mColor}">${mLabel}</span>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;margin-bottom:6px;">
+        <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px;">Base score (highest tier reached)</div>
+        ${tierRows}
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;">
+        <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px;">Bonus points</div>
+        ${bonusRows}
+      </div>`;
+  })();
+
+  // Net zero field with manual entry
+  const nzSource_display = r.net_zero_source
+    || (r.sustainability_url ? (() => { try { return new URL(r.sustainability_url).hostname.replace('www.',''); } catch { return null; } })() : null)
+    || 'web search';
+  const nzSource_url = r.net_zero_source_url || r.sustainability_url || null;
+  const nzSourceLink = nzSource_url
+    ? `<a href="${nzSource_url}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;font-family:var(--mono);font-size:.62rem;" title="${nzSource_url}">&#x2197; ${nzSource_display}</a>`
+    : `<span style="font-family:var(--mono);font-size:.62rem;color:var(--text3);">via ${nzSource_display}</span>`;
+  const nzFieldHtml = r.net_zero_target_year
+    ? `<span style="font-family:var(--mono);color:var(--lime);font-size:.9rem;">${r.net_zero_target_year}</span>
+       ${nzSourceLink}
+       <button onclick="rejectNetZeroTarget(${r._idx})" title="Remove" style="background:none;border:1px solid rgba(248,113,113,.3);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.65rem;padding:1px 7px;margin-left:8px;" onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.3)'">&#x2715;</button>`
+    : (() => {
+        const notFound = r.sustainability_url && r.status === 'Success';
+        return (notFound ? `<div style="font-family:var(--mono);font-size:.75rem;color:var(--text3);font-style:italic;margin-bottom:6px;">No net zero target found on sustainability page</div>` : '')
+          + `<a href="${nzSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" style="display:inline-block;font-size:.7rem;color:var(--amber);text-decoration:none;margin-bottom:5px;">&#x1F50D; Search Google &#x2197;</a>
+       <div class="rerun-wrap">
+         <input class="rerun-input" id="pnzi_${r._idx}" placeholder="e.g. 2035" style="width:80px;"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();setNetZeroTarget(${r._idx},this.value)}">
+         <button class="rerun-btn" onclick="setNetZeroTarget(${r._idx},document.getElementById('pnzi_${r._idx}').value)">&#x2713; Set</button>
+       </div>`;
+      })()
+
+  function pf(label, value, full=false) {
+    if (!value) return '';
+    return `<div class="pf${full?' full':''}"><div class="pf-label">${label}</div><div class="pf-value">${value}</div></div>`;
+  }
+
+  // Helper: section header
+  function pSection(icon, title) {
+    return `<div class="full" style="margin:1rem 0 .4rem;border-top:1px solid var(--border1);padding-top:.75rem;">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);">${icon} ${title}</div>
+    </div>`;
+  }
+
+  // Helper: render a value row, with fallback text if missing
+  function pRow(label, value, fallback='Not extracted', full=false) {
+    const display = value
+      ? `<div class="pf-value">${value}</div>`
+      : `<div class="pf-value" style="color:var(--text3);font-style:italic;">${fallback}</div>`;
+    return `<div class="pf${full?' full':''}"><div class="pf-label">${label}</div>${display}</div>`;
+  }
+
+  // ── Carbon Data section ───────────────────────────────────────────────────
+  const carbonSection = pSection('📊', 'Carbon Data') +
+    pRow('Reported Emissions', r.carbon_data ? `<span style="font-size:.8rem;color:var(--text2);">${r.carbon_data}</span>` : null, 'No emissions data extracted', true) +
+    pRow('Reduction Targets', r.emissions_reduction_target ? `<span style="font-size:.8rem;color:var(--text2);">${r.emissions_reduction_target}</span>` : null, 'No reduction targets extracted', true);
+
+  // ── Net Zero section ──────────────────────────────────────────────────────
+  const netZeroSection = pSection('🎯', 'Net Zero') +
+    `<div class="pf full"><div class="pf-label">Net Zero Target</div><div class="pf-value">${nzFieldHtml}</div></div>` +
+    pf('Transition Plan', tplanHtml, true);
+
+  // ── Certifications & Accreditations section ───────────────────────────────
+  const sbtiHtml = sbtiDisplay
+    ? `<span style="font-size:.8rem;color:var(--text2);">${sbtiDisplay}</span>`
+    : null;
+  const cdpHtml = cdpDisplay
+    ? `<span style="font-size:.8rem;color:var(--text2);">${cdpDisplay}</span>`
+    : null;
+
+  // Format certifications as pills if present
+  const certPills = r.certifications
+    ? r.certifications.split(',').map(c => c.trim()).filter(Boolean)
+        .map(c => `<span style="display:inline-block;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:4px;padding:1px 8px;font-size:.7rem;color:var(--sky);margin:2px 3px 2px 0;">${c}</span>`)
+        .join('')
+    : null;
+
+  const certSection = pSection('🏅', 'Certifications & Accreditations') +
+    pRow('SBTi', sbtiHtml, 'Not listed on SBTi') +
+    pRow('CDP', cdpHtml, 'No CDP score found') +
+    (r.sme_hub_member ? pf('SME Climate Hub', smeDisplay, true) : '') +
+    pRow('Standards & Certs', certPills ? `<div style="margin-top:2px;">${certPills}</div>` : null, 'No certifications extracted', true);
+
+  // ── Initiatives section ───────────────────────────────────────────────────
+  const initItems = r.key_initiatives
+    ? r.key_initiatives.split(',').map(i => i.trim()).filter(Boolean)
+        .map(i => `<div style="display:flex;gap:6px;align-items:baseline;margin-bottom:3px;"><span style="color:var(--green);flex-shrink:0;">▸</span><span style="font-size:.8rem;color:var(--text2);">${i}</span></div>`)
+        .join('')
+    : null;
+
+  const summaryHtml = r.sustainability_summary
+    ? `<div style="font-size:.8rem;color:var(--text2);line-height:1.6;margin-bottom:${r.key_initiatives?'.75rem':'0'};">${r.sustainability_summary}</div>`
+    : `<div style="font-size:.8rem;color:var(--text3);font-style:italic;margin-bottom:${r.key_initiatives?'.75rem':'0'};">
+        No summary extracted — the sustainability page couldn't be read${!aiEnabled() ? ', and no AI key is set' : ''}.
+        ${r.sustainability_url ? `<a href="${r.sustainability_url}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;margin-left:4px;">View page ↗</a>` : ''}
+      </div>`;
+
+  const initiativesSection = pSection('🌱', 'Initiatives') +
+    `<div class="full"><div class="pf-label">Summary</div><div class="pf-value">${summaryHtml}${initItems ? `<div style="margin-top:4px;">${initItems}</div>` : r.sustainability_summary ? '' : '<div style="font-size:.75rem;color:var(--text3);font-style:italic;margin-top:4px;">No initiatives extracted.</div>'}</div></div>`;
+
+  document.getElementById('pGrid').innerHTML = `
+    ${pf('Status', sBadge(r.status))}
+    ${pf('Maturity', maturityDisplay, true)}
+    ${carbonSection}
+    ${netZeroSection}
+    ${certSection}
+    ${initiativesSection}
+    ${pf('Last Run', r.extraction_date)}
+    ${pf('Confidence', (() => {
+  const map = { High:'b-ok', Medium:'b-warn', Low:'b-err' };
+  const reasons = r.confidence_reasons || [];
+  const badge = '<span class="badge ' + (map[r.confidence]||'b-dim') + '">' + (r.confidence||'—') + '</span>';
+  if (!reasons.length) return badge;
+  const list = reasons.map(rr => {
+    const isPos = rr.startsWith('✓');
+    const col = isPos ? 'var(--green)' : 'var(--amber,#f59e0b)';
+    return '<div style="font-size:.72rem;color:' + col + ';margin-top:2px;">' + rr + '</div>';
+  }).join('');
+  return badge + '<div style="margin-top:6px;">' + list + '</div>';
+})())}
+  `;
+
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('overlay').classList.remove('open');
+}
+
+// ── View toggle ────────────────────────────────────────────────────────────────
+function setView(v) {
+  currentView = v;
+  document.getElementById('tableView').style.display = v==='table' ? 'block' : 'none';
+  document.getElementById('cardsView').style.display = v==='cards' ? 'block' : 'none';
+  document.getElementById('vTable').classList.toggle('primary', v==='table');
+  document.getElementById('vCards').classList.toggle('primary', v==='cards');
+  applyFilters();
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────────
+function exportCsv() {
+  if (!allResults.length) { toast('No data to export'); return; }
+  // [field, CSV header label] pairs — labels match what loadRows expects on re-import
+  const EXPORT_COLS = [
+    ['company',                  'company'],
+    ['website',                  'website'],
+    ['status',                   'status'],
+    ['sustainability_url',        'sustainability_url'],
+    ['sustainability_summary',    'sustainability_summary'],
+    ['net_zero_target_year',      'net_zero_target_year'],
+    ['net_zero_source',           'net_zero_source'],
+    ['net_zero_source_url',       'net_zero_source_url'],
+    ['emissions_reduction_target','emissions_reduction_target'],
+    ['carbon_data',               'carbon_data'],
+    ['certifications',            'certifications'],
+    ['key_initiatives',           'key_initiatives'],
+    ['transition_plan_url',       'transition_plan_url'],
+    ['transition_plan_title',     'transition_plan_title'],
+    ['doc_confidence',            'doc_confidence'],
+    ['sbti_near_term_status',     'sbti_near_term_status'],
+    ['sbti_net_zero_status',      'sbti_net_zero_status'],
+    ['sbti_temperature',          'sbti_temperature'],
+    ['cdp_score',                 'cdp_score'],
+    ['sme_hub_member',            'sme_hub_member'],
+    ['sme_hub_url',               'sme_hub_url'],
+    ['maturity_score',            'maturity_score'],
+    ['confidence',                'confidence'],
+    ['confidence_reasons',        'confidence_reasons'],
+    ['extraction_date',           'extraction_date'],
+  ];
+  function csvCell(v) {
+    if (v === null || v === undefined || v === '') return '';
+    // Arrays (e.g. confidence_reasons) → compact JSON so they survive a CSV round-trip
+    if (Array.isArray(v)) v = JSON.stringify(v);
+    const s = String(v).replace(/"/g, '""');
+    return (s.includes(',') || s.includes('"') || s.includes('\n')) ? '"' + s + '"' : s;
+  }
+  const header = EXPORT_COLS.map(([,h]) => h).join(',');
+  const csvRows = allResults.map(r => EXPORT_COLS.map(([f]) => csvCell(r[f])).join(','));
+  const csv = [header, ...csvRows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'greenlens_export.csv';
+  a.click();
+  toast('CSV exported');
+}
+
+// ── Auth init ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => { initAuth(); });
+
+// ── Input tab switching ────────────────────────────────────────────────────────
+function switchInputTab(tab) {
+  const isFile = tab === 'file';
+  document.getElementById('panelFile').style.display   = isFile ? 'block' : 'none';
+  document.getElementById('panelManual').style.display = isFile ? 'none'  : 'block';
+  document.getElementById('tabFile').style.borderBottomColor   = isFile ? 'var(--green)' : 'transparent';
+  document.getElementById('tabFile').style.color               = isFile ? 'var(--text1)' : 'var(--text3)';
+  document.getElementById('tabManual').style.borderBottomColor = isFile ? 'transparent' : 'var(--green)';
+  document.getElementById('tabManual').style.color             = isFile ? 'var(--text3)' : 'var(--text1)';
+  if (!isFile) {
+    setTimeout(() => document.getElementById('manualInput')?.focus(), 50);
+  }
+}
+
+// Live count update
+document.getElementById('manualInput')?.addEventListener('input', function() {
+  const lines = this.value.split('\n').filter(l => l.trim()).length;
+  document.getElementById('manualCount').textContent = lines ? `${lines} company${lines===1?'':'s'}` : '';
+});
+
+function loadManualInput() {
+  const raw = document.getElementById('manualInput')?.value || '';
+  const rows = raw.split('\n')
+    .map(l => l.trim()).filter(Boolean)
+    .map(line => {
+      // Support comma or tab as separator for optional website
+      const sep = line.includes('\t') ? '\t' : ',';
+      const parts = line.split(sep).map(p => p.trim());
+      const obj = { 'Company Name': parts[0] };
+      if (parts[1]) obj['Website'] = parts[1].replace(/^https?:\/\//,'').replace(/\/$/,'');
+      return obj;
+    });
+  if (!rows.length) { toast('No companies entered'); return; }
+  loadRows(rows);
+}
+
+// ── Drag-and-drop ──────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropzone');
+if (dz) {
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+}
+
+// ── SheetJS loader (lazy) ───────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  document.head.appendChild(s);
+
+  // Auto-load saved API key
+  const savedKey   = localStorage.getItem('greenlens_api_key')  || '';
+  const savedModel = localStorage.getItem('greenlens_model')    || 'google/gemini-2.0-flash-001';
+  if (savedKey) {
+    aiConfig.apiKey  = savedKey;
+    aiConfig.model   = savedModel;
+    aiConfig.enabled = true;
+    const pill = document.getElementById('aiPill');
+    if (pill) pill.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
