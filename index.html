@@ -265,6 +265,7 @@ tr:hover td{background:rgba(255,255,255,.015);}
 <div class="tbl-wrap" id="tableView" style="display:none">
   <table>
     <thead><tr>
+      <th style="width:36px;text-align:center;" title="Checked">&#x2714;</th>
       <th onclick="colSortBy('name')" class="th-sort">Company <span class="sort-arrow" id="sa-name"></span></th>
       <th onclick="colSortBy('status')" class="th-sort">Status <span class="sort-arrow" id="sa-status"></span></th>
       <th onclick="colSortBy('suspage')" class="th-sort">Sustainability Page <span class="sort-arrow" id="sa-suspage"></span></th>
@@ -547,6 +548,21 @@ async function saveResultToDb(r) {
     confidence: r.confidence || null,
     confidence_reasons: r.confidence_reasons || null,
     extraction_date: r.extraction_date || null,
+    user_checked: r.user_checked || false,
+    user_notes: r.user_notes || null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'project_id,company' });
+}
+
+async function saveUserFields(r) {
+  // Lightweight save — only updates the two user-editable fields
+  if (!_supaUser || !_activeProject) return;
+  await _supa.from('greenlens_results').upsert({
+    project_id: _activeProject.id,
+    user_id: _supaUser.id,
+    company: r.company,
+    user_checked: r.user_checked || false,
+    user_notes: r.user_notes || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -701,9 +717,19 @@ async function aiFindWebsite(companyName) {
     .replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/^www\./,'');
   if (!domain || !domain.includes('.')) return null;
   log('b', `  AI suggests domain: ${domain}`);
-  // Verify the domain actually responds
+  // Verify domain responds — try HEAD first, then proxy fetch as fallback
   const ok = await quickCheckUrl(`https://${domain}`);
-  if (!ok) { log('a', `  AI domain ${domain} unreachable — rejecting`); return null; }
+  if (!ok) {
+    // HEAD/GET failed — try proxy before giving up (some servers block direct browser requests)
+    const probeHtml = await proxyFetch(`https://${domain}`, 6000);
+    if (!probeHtml) { log('a', `  AI domain ${domain} unreachable — rejecting`); return null; }
+    // Got a response via proxy — check it's not parked
+    const probeText = probeHtml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').toLowerCase().slice(0, 800);
+    if (/buy\s*this\s*domain|domain\s*(is\s*)?(for\s*sale|parked)|hugedomains|sedo\.com/i.test(probeText)) {
+      log('a', `  AI domain ${domain} is parked — rejecting`); return null;
+    }
+    return domain; // Proxy confirms it's a real site
+  }
   // Quick proxy check for parked/for-sale pages — if proxy is blocked, trust the domain
   const html = await proxyFetch(`https://${domain}`, 5000);
   if (html) {
@@ -836,7 +862,7 @@ async function scanAndExtractSusPage(url, companyName) {
 
   const answer = await aiAsk(
     `You are reviewing a web page for "${companyName}".\n` +
-    `Does this page contain substantive sustainability or carbon data? ACCEPT: sustainability pages, ESG pages, carbon reduction plans, net zero plans, climate action pages, OR any page reporting actual emissions data. REJECT only: generic homepages, unrelated news/press, cookie/privacy/legal pages.\n` +
+    `Does this page contain substantive sustainability or environmental content? ACCEPT: sustainability pages, ESG pages, carbon/net zero plans, climate pages, corporate responsibility pages, environmental policy pages, OR any page with emissions data. REJECT only: generic homepages with zero sustainability content, unrelated news/press, cookie/privacy/legal pages, whistleblowing pages, investor relations pages.\n` +
     `Extract data and reply ONLY with JSON (null for any field not found):\n` +
     `{"is_valid_sus_page":true/false,"rejection_reason":"<brief reason if false, else null>","net_zero_target_year":<4-digit year or null>,"net_zero_source":"<e.g. stated on sustainability page>","emissions_reduction_target":"<e.g. 50% Scope 1&2 reduction by 2030 vs 2018>","carbon_data":"<e.g. Scope 1: 12,345 tCO2e, Scope 2: 4,567 tCO2e, Scope 3: 89,012 tCO2e>","sustainability_summary":"<2-3 sentence summary>","certifications":"<comma-separated e.g. ISO 14001, B Corp, TCFD>","key_initiatives":"<comma-separated>"}\n\n` +
     `For carbon_data: scan carefully for Scope 1/2/3 figures — they are often in tables (rows shown pipe-separated below). Format as "Scope 1: X tCO2e, Scope 2: Y tCO2e, Scope 3: Z tCO2e".\n` +
@@ -1029,17 +1055,16 @@ function log(cls, msg) {
   d.className = 'log-' + cls;
   d.textContent = msg;
   el.appendChild(d);
-  // Auto-scroll the log-body div (parent of logLines)
-  const body = document.getElementById('logLines').parentElement;
-  if (body && !body.classList.contains('collapsed')) {
-    body.scrollTop = body.scrollHeight;
+  // Auto-scroll — logLines IS the scrollable div
+  if (!el.parentElement.classList.contains('collapsed')) {
+    el.scrollTop = el.scrollHeight;
   }
 }
 
 function toggleLog() {
-  const body = document.getElementById('logLines').parentElement;
+  const el = document.getElementById('logLines');
   const arrow = document.getElementById('logToggleArrow');
-  body.classList.toggle('collapsed');
+  el.classList.toggle('collapsed');
   arrow.classList.toggle('collapsed');
 }
 
@@ -1502,11 +1527,13 @@ function scoreDocumentRelevance(url, title) {
   // Low: PDF with a report/policy/strategy-sounding keyword — must have a meaningful signal
   if (isPdf && (DOC_LOW_URL.test(u) || DOC_LOW_TITLE.test(t))) return 'low';
 
-  // Non-PDF with clear sustainability name in URL path
-  if (!isPdf && /sustainab|esg|environment|carbon|net.?zero|climate|responsib|csr/i.test(u)) return 'medium';
-
-  // Non-PDF with medium-confidence keyword
-  if (DOC_MED_URL.test(u) || DOC_MED_TITLE.test(t)) return 'medium';
+  // Non-PDF: only accept if URL path clearly names a document type (report, plan, strategy etc.)
+  // Reject generic sustainability sub-pages like /sustainability/compliance or /whistleblowing
+  if (!isPdf) {
+    const docPath = /report|plan|strategy|framework|disclosure|statement|policy/i.test(u);
+    if (docPath && /sustainab|esg|environment|carbon|net.?zero|climate|responsib|csr/i.test(u)) return 'medium';
+    return null; // Generic sustainability page — not a document
+  }
 
   return null; // no relevance signal — skip
 }
@@ -1561,6 +1588,17 @@ async function findReportUrl(website, companyName) {
       if (!urlDomain.includes(domain) && !domain.includes(urlDomain)) {
         log('b', `  Doc rejected (wrong domain: ${urlDomain}): ${url}`);
         continue;
+      }
+      // For CDN/media subdomains, require the URL path to contain a company name signal
+      // Prevents generic government carbon-reduction-plan templates being picked up
+      const isCdnSubdomain = /^(cdn|media|assets|files|static|content|storage)\./i.test(urlDomain.replace(domain,''));
+      if (isCdnSubdomain) {
+        const urlPath = (() => { try { return new URL(url).pathname.toLowerCase(); } catch { return ''; } })();
+        const domainStem = domain.split('.')[0].toLowerCase();
+        if (!urlPath.includes(domainStem) && !/sustainability|esg|net.?zero|carbon.?reduc|transition|climate/i.test(urlPath)) {
+          log('b', `  Doc rejected (CDN path lacks company/sus signal): ${url}`);
+          continue;
+        }
       }
       const title = getDocTitle(url);
       const conf = scoreDocumentRelevance(url, title);
@@ -2380,10 +2418,10 @@ async function startRun() {
   setTimeout(() => { document.getElementById('progWrap').style.display = 'none'; }, 3000);
   // Auto-collapse the log after run so results are visible
   setTimeout(() => {
-    const body = document.getElementById('logLines')?.parentElement;
+    const logEl = document.getElementById('logLines');
     const arrow = document.getElementById('logToggleArrow');
-    if (body && !body.classList.contains('collapsed')) {
-      body.classList.add('collapsed');
+    if (logEl && !logEl.classList.contains('collapsed')) {
+      logEl.classList.add('collapsed');
       if (arrow) arrow.classList.add('collapsed');
     }
   }, 1500);
@@ -2469,6 +2507,7 @@ function loadRows(rows) {
     'sustainability_summary':'sustainability_summary','certifications':'certifications',
     'emissions_reduction_target':'emissions_reduction_target','carbon_data':'carbon_data',
     'key_initiatives':'key_initiatives',
+    'user_checked':'user_checked','user_notes':'user_notes',
   };
 
   allResults = rows
@@ -2549,7 +2588,7 @@ function colSortBy(key) {
     currentSort.key = key;
     currentSort.dir = 'asc';
   }
-  ['name','status','suspage','nz','summary','certs','maturity','reason','date','doc','confidence'].forEach(k => {
+  ['checked','name','status','suspage','nz','summary','certs','maturity','reason','date','doc','confidence'].forEach(k => {
     const el = document.getElementById('sa-'+k);
     if (el) el.className = 'sort-arrow' + (k===key ? ' '+currentSort.dir : '');
   });
@@ -2562,6 +2601,7 @@ function sortResults(data) {
   const confRank = { High: 3, Medium: 2, Low: 1, '': 0 };
   return [...data].sort((a,b) => {
     switch(key) {
+      case 'checked':  return flip*((a.user_checked ? 1 : 0) - (b.user_checked ? 1 : 0));
       case 'name':     return flip*(a.company||'').localeCompare(b.company||'');
       case 'status':   return flip*(a.status||'').localeCompare(b.status||'');
       case 'suspage':  return flip*((a.sustainability_url?1:0)-(b.sustainability_url?1:0));
@@ -2742,6 +2782,11 @@ function renderTable(data) {
     })();
 
     tr.innerHTML = `
+      <td style="text-align:center;vertical-align:middle;" onclick="event.stopPropagation()">
+        <input type="checkbox" ${r.user_checked ? 'checked' : ''} title="Mark as checked"
+          style="width:15px;height:15px;accent-color:var(--green);cursor:pointer;"
+          onchange="toggleChecked(${r._idx},this.checked)">
+      </td>
       <td onclick="event.stopPropagation()">
         <div class="td-co" title="${r.company}" style="cursor:pointer;" onclick="openPanel(_rByIdx[${r._idx}])">${r.company||'&#x2014;'}</div>
         <div class="td-sub">${websiteHtml}</div>
@@ -3117,11 +3162,52 @@ function openPanel(r) {
 })())}
   `;
 
+  // ── User review section ───────────────────────────────────────────────────
+  const reviewSection = document.createElement('div');
+  reviewSection.style.cssText = 'margin-top:1rem;border-top:1px solid var(--border2);padding-top:1rem;';
+  reviewSection.innerHTML = `
+    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.75rem;">&#x270F;&#xFE0F; Your Review</div>
+    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.85rem;">
+      <input type="checkbox" id="panelChecked_${r._idx}" ${r.user_checked ? 'checked' : ''}
+        style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;"
+        onchange="toggleChecked(${r._idx},this.checked);document.querySelectorAll('input[type=checkbox]').forEach(cb=>{ if(cb.dataset.idx=='${r._idx}') cb.checked=this.checked; })">
+      <span style="font-size:.82rem;color:var(--text1);">Checked / reviewed</span>
+    </label>
+    <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Notes</div>
+    <textarea id="notesInput_${r._idx}" rows="4" placeholder="Add notes about this company…"
+      style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
+      onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
+    >${r.user_notes ? r.user_notes.replace(/</g,'&lt;') : ''}</textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:.4rem;">
+      <button id="notesSaveBtn_${r._idx}" class="btn primary" onclick="saveNotes(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save</button>
+    </div>`;
+  document.getElementById('pGrid').appendChild(reviewSection);
+
   document.getElementById('overlay').classList.add('open');
 }
 
 function closePanel() {
   document.getElementById('overlay').classList.remove('open');
+}
+
+function toggleChecked(idx, checked) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  r.user_checked = checked;
+  dbMerge(r);
+  saveUserFields(r).catch(() => {});
+}
+
+function saveNotes(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  const ta = document.getElementById('notesInput_' + idx);
+  if (!ta) return;
+  r.user_notes = ta.value.trim() || null;
+  dbMerge(r);
+  saveUserFields(r).catch(() => {});
+  const btn = document.getElementById('notesSaveBtn_' + idx);
+  if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save', 1500); }
 }
 
 // ── View toggle ────────────────────────────────────────────────────────────────
@@ -3164,6 +3250,8 @@ function exportCsv() {
     ['confidence',                'confidence'],
     ['confidence_reasons',        'confidence_reasons'],
     ['extraction_date',           'extraction_date'],
+    ['user_checked',              'user_checked'],
+    ['user_notes',                'user_notes'],
   ];
   function csvCell(v) {
     if (v === null || v === undefined || v === '') return '';
