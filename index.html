@@ -406,15 +406,32 @@ async function initAuth() {
   if (session?.user) {
     _supaUser = session.user;
     document.getElementById('loginOverlay').style.display = 'none';
-    await showProjectPicker();
+    await restoreOrPickProject();
   }
   _supa.auth.onAuthStateChange(async (_event, session) => {
     _supaUser = session?.user || null;
     if (_supaUser) {
       document.getElementById('loginOverlay').style.display = 'none';
-      await showProjectPicker();
+      await restoreOrPickProject();
     }
   });
+}
+
+async function restoreOrPickProject() {
+  const savedId   = localStorage.getItem('greenlens_project_id');
+  const savedName = localStorage.getItem('greenlens_project_name');
+  if (savedId && savedName) {
+    // Verify the project still exists before restoring
+    const { data } = await _supa.from('projects').select('id,name').eq('id', savedId).single();
+    if (data) {
+      await openProject(data.id, data.name);
+      return;
+    }
+    // Project was deleted — clear saved state
+    localStorage.removeItem('greenlens_project_id');
+    localStorage.removeItem('greenlens_project_name');
+  }
+  await showProjectPicker();
 }
 
 async function doLogin() {
@@ -444,6 +461,8 @@ async function signOut() {
   _supaUser = null;
   _activeProject = null;
   allResults = [];
+  localStorage.removeItem('greenlens_project_id');
+  localStorage.removeItem('greenlens_project_name');
   hideAppUI();
   document.getElementById('projectOverlay').style.display = 'none';
   document.getElementById('loginOverlay').style.display = 'flex';
@@ -464,6 +483,9 @@ function hideAppUI() {
 // ── Project picker ────────────────────────────────────────────────────────────
 async function showProjectPicker() {
   if (!_supaUser) return;
+  _activeProject = null;
+  localStorage.removeItem('greenlens_project_id');
+  localStorage.removeItem('greenlens_project_name');
   hideAppUI();
   document.getElementById('projectOverlay').style.display = 'flex';
   document.getElementById('projectMsg').textContent = '';
@@ -539,6 +561,9 @@ async function deleteProject(id, name, btn) {
 
 async function openProject(id, name) {
   _activeProject = { id, name };
+  // Persist so page reload returns to same project
+  localStorage.setItem('greenlens_project_id',   id);
+  localStorage.setItem('greenlens_project_name', name);
   document.getElementById('projectOverlay').style.display = 'none';
   const label = document.getElementById('activeProjectName');
   if (label) label.textContent = name;
@@ -588,6 +613,8 @@ async function saveResultToDb(r) {
     verified_by: r.verified_by || null,
     verified_at: r.verified_at || null,
     user_notes: r.user_notes || null,
+    manual_maturity_score: r.manual_maturity_score != null ? Number(r.manual_maturity_score) : null,
+    manual_maturity_notes: r.manual_maturity_notes || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -609,6 +636,8 @@ async function saveUserFields(r) {
     verified_by: r.verified_by || null,
     verified_at: r.verified_at || null,
     user_notes: r.user_notes || null,
+    manual_maturity_score: r.manual_maturity_score != null ? Number(r.manual_maturity_score) : null,
+    manual_maturity_notes: r.manual_maturity_notes || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -1914,9 +1943,11 @@ async function processOne(row) {
       susExtracted = await scanAndExtractSusPage(susUrl, company);
       if (susExtracted && !susExtracted.is_valid) {
         const failedUrl = susUrl;
-        // If URL came from actual same-domain homepage links and proxy failed (not AI content rejection), trust it
-        if (susFromHomepage && susExtracted.proxyFailed) {
-          log('b', `  Proxy failed but URL is from real homepage links — keeping`);
+        // If URL came from actual same-domain homepage links, trust it regardless of why
+        // it failed — proxy block, cookie wall, or JS-heavy page all give false negatives
+        // on large enterprise sites. The AI literally found this link on their own homepage.
+        if (susFromHomepage) {
+          log('b', `  URL from real homepage links — keeping despite scan failure`);
           susExtracted = { url: susUrl, is_valid: true };
         } else {
           log('a', `  Sus page invalid — trying DDG fallback...`);
@@ -2581,6 +2612,7 @@ function loadRows(rows) {
     'emissions_reduction_target':'emissions_reduction_target','carbon_data':'carbon_data',
     'key_initiatives':'key_initiatives',
     'verified_by':'verified_by','verified_at':'verified_at','user_notes':'user_notes',
+    'manual_maturity_score':'manual_maturity_score','manual_maturity_notes':'manual_maturity_notes',
   };
 
   allResults = rows
@@ -2901,11 +2933,20 @@ function renderTable(data) {
       </td>
       <td>${susLink}</td>
       <td class="td-mono" onclick="event.stopPropagation()">${nzCell}</td>
-      <td>${summaryText ? `<span class="td-summary" title="${safeSummary}">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : '<span class="td-na">&#x2014;</span>'}</td>
+      <td>
+        ${summaryText ? `<span class="td-summary" title="${safeSummary}">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : '<span class="td-na">&#x2014;</span>'}
+        ${r.user_notes ? `<div style="font-size:.68rem;color:var(--sky);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${r.user_notes.replace(/"/g,'&quot;')}">&#x270F; ${r.user_notes.replace(/</g,'&lt;')}</div>` : ''}
+      </td>
       <td class="td-mono" style="font-size:.72rem;color:var(--text2);max-width:180px;">${r.certifications ? r.certifications.replace(/</g,'&lt;') : '<span class="td-na">&#x2014;</span>'}</td>
-      <td><span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
-          <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span></td>
-      <td><span class="td-summary" title="${safeNarrative}">${narrativeText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></td>
+      <td>
+        <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
+        <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span>
+        ${r.manual_maturity_score != null ? `<div style="font-size:.65rem;color:var(--sky);margin-top:3px;font-family:var(--mono);">&#x270F; ${r.manual_maturity_score}/20</div>` : ''}
+      </td>
+      <td>
+        <span class="td-summary" title="${safeNarrative}">${narrativeText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+        ${r.manual_maturity_notes ? `<div style="font-size:.68rem;color:var(--sky);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${r.manual_maturity_notes.replace(/"/g,'&quot;')}">&#x270F; ${r.manual_maturity_notes.replace(/</g,'&lt;')}</div>` : ''}
+      </td>
       <td class="td-mono" style="font-size:.7rem;color:var(--text3);">${r.extraction_date||'&#x2014;'}</td>
       <td onclick="event.stopPropagation()">${planCell}</td>
       <td style="min-width:120px;">${confidenceCell(r)}</td>
@@ -3260,11 +3301,28 @@ function openPanel(r) {
         : `<button class="btn primary" onclick="toggleVerified(${r._idx})" style="width:100%;justify-content:center;font-size:.8rem;">✓ Mark as verified</button>`}
     </div>
     <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Notes</div>
-    <textarea id="notesInput_${r._idx}" rows="4" placeholder="Add notes about this company…"
+    <textarea id="notesInput_${r._idx}" rows="3" placeholder="Add notes about this company…"
       style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
       onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
     >${r.user_notes ? r.user_notes.replace(/</g,'&lt;') : ''}</textarea>
-    <div style="display:flex;justify-content:flex-end;margin-top:.4rem;">
+
+    <div style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border1);">
+      <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Manual maturity score <span style="color:var(--text3);font-size:.68rem;">(0–20, shown alongside system score)</span></div>
+      <input id="manualScoreInput_${r._idx}" type="number" min="0" max="20" placeholder="e.g. 12"
+        value="${r.manual_maturity_score != null ? r.manual_maturity_score : ''}"
+        style="width:80px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.82rem;padding:.4rem .6rem;outline:none;font-family:var(--mono);"
+        onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'">
+    </div>
+
+    <div style="margin-top:.75rem;">
+      <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Manual maturity notes <span style="color:var(--text3);font-size:.68rem;">(shown under maturity reason)</span></div>
+      <textarea id="manualNotesInput_${r._idx}" rows="2" placeholder="e.g. Score adjusted — verified SBTi targets not yet reflected in data"
+        style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
+        onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
+      >${r.manual_maturity_notes ? r.manual_maturity_notes.replace(/</g,'&lt;') : ''}</textarea>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:.5rem;">
       <button id="notesSaveBtn_${r._idx}" class="btn primary" onclick="saveNotes(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save</button>
     </div>`;
   document.getElementById('pGrid').appendChild(reviewSection);
@@ -3299,11 +3357,22 @@ function toggleVerified(idx) {
 function saveNotes(idx) {
   const r = _rByIdx[idx];
   if (!r) return;
-  const ta = document.getElementById('notesInput_' + idx);
-  if (!ta) return;
-  r.user_notes = ta.value.trim() || null;
+  const ta   = document.getElementById('notesInput_' + idx);
+  const ms   = document.getElementById('manualScoreInput_' + idx);
+  const mn   = document.getElementById('manualNotesInput_' + idx);
+  if (ta) r.user_notes = ta.value.trim() || null;
+  if (ms) {
+    const val = ms.value.trim();
+    if (val === '') { r.manual_maturity_score = null; }
+    else {
+      const n = parseInt(val);
+      r.manual_maturity_score = (!isNaN(n) && n >= 0 && n <= 20) ? n : r.manual_maturity_score;
+    }
+  }
+  if (mn) r.manual_maturity_notes = mn.value.trim() || null;
   dbMerge(r);
   saveUserFields(r).catch(() => {});
+  applyFilters(); // refresh table to show updated manual score
   const btn = document.getElementById('notesSaveBtn_' + idx);
   if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save', 1500); }
 }
@@ -3351,6 +3420,8 @@ function exportCsv() {
     ['verified_by',               'verified_by'],
     ['verified_at',               'verified_at'],
     ['user_notes',                'user_notes'],
+    ['manual_maturity_score',     'manual_maturity_score'],
+    ['manual_maturity_notes',     'manual_maturity_notes'],
   ];
   function csvCell(v) {
     if (v === null || v === undefined || v === '') return '';
