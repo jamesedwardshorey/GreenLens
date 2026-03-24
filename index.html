@@ -249,6 +249,7 @@ tr:hover td{background:rgba(255,255,255,.015);}
 <div class="toolbar" id="toolbar" style="display:none">
   <button class="btn" onclick="setView('table')" id="vTable">&#x229E; Table</button>
   <button class="btn" onclick="setView('cards')" id="vCards">&#x229F; Cards</button>
+  <button class="btn" onclick="setView('audit')" id="vAudit">&#x1F4CB; Audit Log</button>
   <div class="sep"></div>
   <select class="filter-sel" id="fStatus" onchange="applyFilters()">
     <option value="">All statuses</option>
@@ -297,6 +298,28 @@ tr:hover td{background:rgba(255,255,255,.015);}
 </div>
 <div id="cardsView" style="display:none;padding:1rem;">
   <div class="card-grid" id="cardGrid"></div>
+</div>
+<div id="auditView" style="display:none;padding:1rem 1.5rem;">
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <input id="auditSearch" placeholder="&#x1F50D; Search company, user, event…"
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.4rem .8rem;outline:none;min-width:220px;"
+      oninput="filterAuditLog()">
+    <select id="auditEventFilter" onchange="filterAuditLog()"
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.4rem .6rem;outline:none;">
+      <option value="">All events</option>
+      <option value="verified">Verification</option>
+      <option value="notes">Notes / Score</option>
+      <option value="analysis">Analysis</option>
+      <option value="company">Company added/removed</option>
+      <option value="project">Project changes</option>
+      <option value="reuse">Data reused</option>
+    </select>
+    <span id="auditCount" style="font-size:.75rem;color:var(--text3);margin-left:auto;"></span>
+  </div>
+  <div id="auditLogList" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+  <div id="auditLoadMore" style="display:none;text-align:center;margin-top:1rem;">
+    <button class="btn" onclick="loadAuditLog(true)" style="font-size:.75rem;">Load more</button>
+  </div>
 </div>
 <div class="overlay" id="overlay">
   <div class="overlay-bg" onclick="closePanel()"></div>
@@ -592,8 +615,13 @@ async function saveProjectEdit(id) {
   const name = nameEl?.value.trim();
   const desc = descEl?.value.trim() || null;
   if (!name) { toast('Project name cannot be empty'); return; }
+  const oldName = _activeProject?.id === id ? _activeProject.name : name;
   const { error } = await _supa.from('projects').update({ name, description: desc }).eq('id', id);
   if (error) { toast('Failed to save: ' + error.message); return; }
+  const prevActive = _activeProject;
+  if (!_activeProject || _activeProject.id !== id) _activeProject = { id, name };
+  await addAuditEntry('project_renamed', null, { from: oldName, to: name });
+  _activeProject = prevActive;
   if (_activeProject?.id === id) {
     _activeProject.name = name;
     localStorage.setItem('greenlens_project_name', name);
@@ -613,12 +641,22 @@ async function createProject() {
   const { data, error } = await _supa.from('projects').insert({ name, created_by: _supaUser.id }).select().single();
   if (error) { msg.style.color='var(--red)'; msg.textContent = error.message; return; }
   document.getElementById('newProjectName').value = '';
+  // Audit project creation — temporarily set _activeProject so addAuditEntry can use it
+  const _prevProject = _activeProject;
+  _activeProject = { id: data.id, name: data.name };
+  await addAuditEntry('project_created', null, { name: data.name });
+  _activeProject = _prevProject;
   await openProject(data.id, data.name);
 }
 
 async function deleteProject(id, name, btn) {
   if (!confirm(`Delete project "${name}" and all its results? This cannot be undone.`)) return;
   btn.textContent = '…';
+  // Audit before delete (cascade will remove audit entries too, this is project-level note)
+  const prevActive = _activeProject;
+  _activeProject = { id, name };
+  await addAuditEntry('project_deleted', null, { name });
+  _activeProject = prevActive;
   await _supa.from('projects').delete().eq('id', id);
   await renderProjectList();
   toast(`Deleted: ${name}`);
@@ -684,6 +722,122 @@ async function saveResultToDb(r) {
     source_project_name:   r.source_project_name || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
+}
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+const AUDIT_EVENT_LABELS = {
+  'verified':         { icon: '✓', label: 'Verified',          color: 'var(--green)' },
+  'unverified':       { icon: '○', label: 'Verification cleared', color: 'var(--text3)' },
+  'notes_saved':      { icon: '✏', label: 'Notes saved',        color: 'var(--sky)' },
+  'score_saved':      { icon: '✏', label: 'Score updated',      color: 'var(--sky)' },
+  'analysis_run':     { icon: '▶', label: 'Analysis run',       color: 'var(--amber)' },
+  'analysis_rerun':   { icon: '↺', label: 'Re-analysis run',    color: 'var(--amber)' },
+  'data_reused':      { icon: '⊞', label: 'Data reused',        color: 'var(--violet)' },
+  'company_added':    { icon: '+', label: 'Company added',       color: 'var(--green)' },
+  'company_removed':  { icon: '−', label: 'Company removed',    color: 'var(--red)' },
+  'project_created':  { icon: '★', label: 'Project created',    color: 'var(--green)' },
+  'project_renamed':  { icon: '✏', label: 'Project renamed',    color: 'var(--sky)' },
+  'project_deleted':  { icon: '✕', label: 'Project deleted',    color: 'var(--red)' },
+};
+
+async function addAuditEntry(eventType, company, detail = {}) {
+  if (!_supaUser || !_activeProject) return;
+  try {
+    await _supa.from('audit_log').insert({
+      project_id: _activeProject.id,
+      company: company || null,
+      user_email: _supaUser.email,
+      event_type: eventType,
+      detail,
+    });
+  } catch(e) { console.warn('Audit log failed:', e.message); }
+}
+
+let _auditCache = [], _auditOffset = 0, _auditFiltered = [];
+const AUDIT_PAGE = 50;
+
+async function loadAuditLog(loadMore = false) {
+  if (!_activeProject) return;
+  if (!loadMore) { _auditOffset = 0; _auditCache = []; }
+  const { data, error } = await _supa
+    .from('audit_log')
+    .select('*')
+    .eq('project_id', _activeProject.id)
+    .order('created_at', { ascending: false })
+    .range(_auditOffset, _auditOffset + AUDIT_PAGE - 1);
+  if (error || !data) return;
+  _auditCache = loadMore ? [..._auditCache, ...data] : data;
+  _auditOffset += data.length;
+  document.getElementById('auditLoadMore').style.display = data.length === AUDIT_PAGE ? 'block' : 'none';
+  filterAuditLog();
+}
+
+function filterAuditLog() {
+  const search = (document.getElementById('auditSearch')?.value || '').toLowerCase();
+  const evtFilter = document.getElementById('auditEventFilter')?.value || '';
+  const evtGroups = {
+    'verified':  ['verified','unverified'],
+    'notes':     ['notes_saved','score_saved'],
+    'analysis':  ['analysis_run','analysis_rerun'],
+    'company':   ['company_added','company_removed'],
+    'project':   ['project_created','project_renamed','project_deleted'],
+    'reuse':     ['data_reused'],
+  };
+  _auditFiltered = _auditCache.filter(e => {
+    if (evtFilter && evtGroups[evtFilter] && !evtGroups[evtFilter].includes(e.event_type)) return false;
+    if (search) {
+      const haystack = [e.company||'', e.user_email||'', e.event_type||'', JSON.stringify(e.detail||{})].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+  renderAuditLog();
+}
+
+function renderAuditLog() {
+  const list = document.getElementById('auditLogList');
+  const count = document.getElementById('auditCount');
+  if (!list) return;
+  if (count) count.textContent = `${_auditFiltered.length} event${_auditFiltered.length!==1?'s':''}`;
+  if (!_auditFiltered.length) {
+    list.innerHTML = '<div style="color:var(--text3);font-size:.82rem;padding:1rem 0;">No events found</div>';
+    return;
+  }
+  list.innerHTML = _auditFiltered.map(e => {
+    const meta  = AUDIT_EVENT_LABELS[e.event_type] || { icon:'·', label: e.event_type, color:'var(--text3)' };
+    const when  = new Date(e.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const detail = e.detail || {};
+    let detailHtml = '';
+    if (detail.from !== undefined && detail.to !== undefined)
+      detailHtml = `<span style="color:var(--text3);">${String(detail.from||'—').slice(0,40)} → ${String(detail.to||'—').slice(0,40)}</span>`;
+    else if (detail.source_project)
+      detailHtml = `<span style="color:var(--text3);">from: ${detail.source_project}</span>`;
+    else if (detail.note)
+      detailHtml = `<span style="color:var(--text3);">${String(detail.note).slice(0,80)}</span>`;
+    return `<div style="display:grid;grid-template-columns:28px 1fr auto;gap:4px 10px;align-items:start;padding:.5rem .6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--border1);">
+      <div style="font-size:.8rem;color:${meta.color};font-weight:700;text-align:center;margin-top:1px;">${meta.icon}</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+          <span style="font-size:.75rem;color:${meta.color};font-weight:600;">${meta.label}</span>
+          ${e.company ? `<span style="font-size:.72rem;color:var(--text2);">· ${e.company}</span>` : ''}
+        </div>
+        ${detailHtml ? `<div style="font-size:.7rem;margin-top:2px;">${detailHtml}</div>` : ''}
+        <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${getInitials(e.user_email)} (${e.user_email}) · ${when}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCompanyAuditHistory(company) {
+  if (!_activeProject || !company) return [];
+  const { data } = await _supa
+    .from('audit_log')
+    .select('*')
+    .eq('project_id', _activeProject.id)
+    .eq('company', company)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  return data || [];
 }
 
 function getInitials(email) {
@@ -2043,6 +2197,8 @@ async function processOne(row) {
       extraction_date:          crossMatch.extraction_date || base.extraction_date,
     };
     reused.maturity_score = calcMaturity(reused);
+    // Audit after return — caller will save via queueSave
+    addAuditEntry('data_reused', company, { source_project: crossMatch.source_project_name, original_date: crossMatch.extraction_date });
     return reused;
   }
 
@@ -2337,6 +2493,7 @@ async function removeFromProject(idx) {
   const r = _rByIdx[idx];
   if (!r) return;
   if (!confirm(`Remove "${r.company}" from this project? This cannot be undone.`)) return;
+  await addAuditEntry('company_removed', r.company, { website: r.website || null });
   // Delete from Supabase
   if (_activeProject) {
     await _supa.from('greenlens_results')
@@ -2655,6 +2812,7 @@ async function startRun() {
           Object.assign(r, result);
           dbMerge(r);
           queueSave(r); // persist to Supabase via queue
+          addAuditEntry(r._wasRerun ? 'analysis_rerun' : 'analysis_run', r.company, { status: r.status, website: r.website || null });
         }
       } catch(e) {
         r.status = 'Website not found';
@@ -2809,6 +2967,10 @@ function loadRows(rows) {
   applyFilters();
   updateStats(allResults);
   toast(`Loaded ${allResults.length} companies`);
+  // Audit new companies (fire-and-forget, don't block UI)
+  if (_activeProject && _supaUser) {
+    allResults.forEach(r => addAuditEntry('company_added', r.company, { via: 'upload' }));
+  }
 }
 
 function loadDemo() {
@@ -3481,6 +3643,32 @@ function openPanel(r) {
     </div>`;
   document.getElementById('pGrid').appendChild(reviewSection);
 
+  // Company audit history (async — appended after render)
+  (async () => {
+    const history = await loadCompanyAuditHistory(r.company);
+    if (!history.length) return;
+    const histDiv = document.getElementById('pGrid');
+    if (!histDiv || document.getElementById('pName').textContent !== r.company) return;
+    const hSection = document.createElement('div');
+    hSection.style.cssText = 'margin-top:1rem;border-top:1px solid var(--border2);padding-top:.85rem;';
+    hSection.innerHTML = `<div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.6rem;">&#x1F4CB; Recent activity</div>`
+      + history.slice(0,5).map(e => {
+          const meta = AUDIT_EVENT_LABELS[e.event_type] || { icon:'·', label: e.event_type, color:'var(--text3)' };
+          const when = new Date(e.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+          const detail = e.detail || {};
+          let dStr = '';
+          if (detail.from !== undefined && detail.to !== undefined) dStr = ` ${String(detail.from||'—').slice(0,20)} → ${String(detail.to||'—').slice(0,20)}`;
+          else if (detail.note) dStr = ` "${String(detail.note).slice(0,40)}"`;
+          return `<div style="display:flex;align-items:baseline;gap:.5rem;padding:3px 0;border-bottom:1px solid var(--border1);">
+            <span style="font-size:.7rem;color:${meta.color};font-weight:600;flex-shrink:0;">${meta.icon}</span>
+            <span style="font-size:.72rem;color:var(--text2);flex:1;">${meta.label}${dStr}</span>
+            <span style="font-size:.65rem;color:var(--text3);white-space:nowrap;">${getInitials(e.user_email)} · ${when}</span>
+          </div>`;
+        }).join('')
+      + (history.length > 5 ? `<div style="font-size:.68rem;color:var(--text3);margin-top:4px;text-align:right;cursor:pointer;" onclick="setView('audit');document.getElementById('auditSearch').value='${r.company.replace(/'/g,"\'")}';filterAuditLog();">See all in audit log →</div>` : '');
+    histDiv.appendChild(hSection);
+  })();
+
   // Source project section
   if (r.source_project_name) {
     const srcDiv = document.createElement('div');
@@ -3504,18 +3692,17 @@ function toggleVerified(idx) {
   const r = _rByIdx[idx];
   if (!r) return;
   if (r.verified_by) {
-    // Already verified — clear it
+    addAuditEntry('unverified', r.company, { from: r.verified_by });
     r.verified_by = null;
     r.verified_at = null;
   } else {
-    // Mark as verified by current user
     r.verified_by = _supaUser?.email || 'unknown';
     r.verified_at = new Date().toISOString();
+    addAuditEntry('verified', r.company, { by: r.verified_by });
   }
   dbMerge(r);
   saveUserFields(r).catch(() => {});
   applyFilters();
-  // Update panel if open
   if (document.getElementById('overlay').classList.contains('open') &&
       document.getElementById('pName').textContent === r.company) openPanel(r);
 }
@@ -3526,6 +3713,8 @@ function saveNotes(idx) {
   const ta   = document.getElementById('notesInput_' + idx);
   const ms   = document.getElementById('manualScoreInput_' + idx);
   const mn   = document.getElementById('manualNotesInput_' + idx);
+  const prevNotes = r.user_notes;
+  const prevScore = r.manual_maturity_score;
   if (ta) r.user_notes = ta.value.trim() || null;
   if (ms) {
     const val = ms.value.trim();
@@ -3536,9 +3725,15 @@ function saveNotes(idx) {
     }
   }
   if (mn) r.manual_maturity_notes = mn.value.trim() || null;
+  // Audit: notes changed
+  if (r.user_notes !== prevNotes)
+    addAuditEntry('notes_saved', r.company, { note: r.user_notes || '(cleared)' });
+  // Audit: score changed
+  if (r.manual_maturity_score !== prevScore)
+    addAuditEntry('score_saved', r.company, { from: prevScore ?? '—', to: r.manual_maturity_score ?? '—' });
   dbMerge(r);
   saveUserFields(r).catch(() => {});
-  applyFilters(); // refresh table to show updated manual score
+  applyFilters();
   const btn = document.getElementById('notesSaveBtn_' + idx);
   if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save', 1500); }
 }
@@ -3548,9 +3743,12 @@ function setView(v) {
   currentView = v;
   document.getElementById('tableView').style.display = v==='table' ? 'block' : 'none';
   document.getElementById('cardsView').style.display = v==='cards' ? 'block' : 'none';
+  document.getElementById('auditView').style.display = v==='audit' ? 'block' : 'none';
   document.getElementById('vTable').classList.toggle('primary', v==='table');
   document.getElementById('vCards').classList.toggle('primary', v==='cards');
-  applyFilters();
+  document.getElementById('vAudit').classList.toggle('primary', v==='audit');
+  if (v === 'audit') loadAuditLog(false);
+  else applyFilters();
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────────
