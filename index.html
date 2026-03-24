@@ -164,48 +164,62 @@ tr:hover td{background:rgba(255,255,255,.015);}
   <label>Delay (s)</label>
   <select id="delay"><option value="0.5">0.5</option><option value="1" selected>1</option><option value="1.5">1.5</option><option value="2">2</option></select>
 </div>
-<div id="uploadSection">
-  <!-- Input mode tabs -->
-  <div style="display:flex;gap:0;border-bottom:1px solid var(--border2);margin:1.5rem 1.5rem 0;">
-    <button id="tabFile" onclick="switchInputTab('file')"
-      style="background:none;border:none;border-bottom:2px solid var(--green);color:var(--text1);font-size:.78rem;padding:.5rem 1.1rem;cursor:pointer;font-family:var(--sans);font-weight:500;margin-bottom:-1px;">
-      &#x1F4C2; Upload file
-    </button>
-    <button id="tabManual" onclick="switchInputTab('manual')"
-      style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-size:.78rem;padding:.5rem 1.1rem;cursor:pointer;font-family:var(--sans);font-weight:500;margin-bottom:-1px;">
-      &#x270F; Enter manually
-    </button>
+<div id="uploadSection" style="border-bottom:1px solid var(--border2);background:var(--bg2);">
+  <!-- Collapsible header — always visible -->
+  <div id="uploadHeader" onclick="toggleUploadSection()"
+    style="display:flex;align-items:center;justify-content:space-between;padding:.55rem 1.5rem;cursor:pointer;user-select:none;"
+    onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='none'">
+    <div style="display:flex;align-items:center;gap:.7rem;">
+      <span style="font-size:.78rem;font-weight:600;color:var(--text2);">&#x2795; Add companies</span>
+      <span id="uploadHeaderHint" style="font-size:.7rem;color:var(--text3);">Upload CSV/Excel or enter manually</span>
+    </div>
+    <span id="uploadToggleArrow" style="font-size:.65rem;color:var(--text3);transition:transform .2s;">&#x25BC;</span>
   </div>
 
-  <!-- File upload panel -->
-  <div id="panelFile" style="padding:1.5rem;">
-    <div class="upload-zone" id="dropzone" onclick="document.getElementById('fileIn').click()">
-      <h2>&#x1F4C2; Drop CSV / Excel or click to upload</h2>
-      <p>Needs a <strong>Company Name</strong> column &mdash; optional: Website, Sustainability URL</p>
-      <input type="file" id="fileIn" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+  <!-- Collapsible body -->
+  <div id="uploadBody" style="display:none;">
+    <!-- Input mode tabs -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border2);margin:0 1.5rem;">
+      <button id="tabFile" onclick="switchInputTab('file')"
+        style="background:none;border:none;border-bottom:2px solid var(--green);color:var(--text1);font-size:.78rem;padding:.5rem 1.1rem;cursor:pointer;font-family:var(--sans);font-weight:500;margin-bottom:-1px;">
+        &#x1F4C2; Upload file
+      </button>
+      <button id="tabManual" onclick="switchInputTab('manual')"
+        style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-size:.78rem;padding:.5rem 1.1rem;cursor:pointer;font-family:var(--sans);font-weight:500;margin-bottom:-1px;">
+        &#x270F; Enter manually
+      </button>
     </div>
-    <div style="text-align:center;padding-top:.5rem;">
-      <button class="btn primary" onclick="loadDemo()">&#x25B6; Load demo data</button>
-    </div>
-  </div>
 
-  <!-- Manual entry panel -->
-  <div id="panelManual" style="display:none;padding:1.5rem;">
-    <div style="max-width:560px;margin:0 auto;">
-      <p style="font-size:.78rem;color:var(--text3);margin-bottom:.75rem;">
-        One company per line. Optionally add a website after a comma or tab.<br>
-        <span style="color:var(--text3);opacity:.7;">e.g. &nbsp;<code style="font-family:var(--mono);font-size:.72rem;background:var(--bg3);padding:1px 5px;border-radius:3px;">Unilever</code> &nbsp;or&nbsp; <code style="font-family:var(--mono);font-size:.72rem;background:var(--bg3);padding:1px 5px;border-radius:3px;">BT Group, bt.com</code></span>
-      </p>
-      <textarea id="manualInput" placeholder="Unilever&#10;BT Group, bt.com&#10;Tesco&#10;HSBC&#10;Rolls-Royce Holdings"
-        style="width:100%;height:220px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-family:var(--mono);font-size:.8rem;padding:.75rem 1rem;outline:none;resize:vertical;line-height:1.6;"
-        onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();loadManualInput()}"
-        onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
-      <div style="display:flex;gap:.6rem;margin-top:.75rem;align-items:center;">
-        <button class="btn primary" onclick="loadManualInput()" style="font-size:.8rem;padding:7px 18px;">
-          &#x25B6; Load companies
-        </button>
-        <span style="font-size:.72rem;color:var(--text3);" id="manualCount"></span>
-        <span style="font-size:.68rem;color:var(--text3);margin-left:auto;">Cmd/Ctrl+Enter to load</span>
+    <!-- File upload panel -->
+    <div id="panelFile" style="padding:1.25rem 1.5rem;">
+      <div class="upload-zone" id="dropzone" onclick="document.getElementById('fileIn').click()">
+        <h2>&#x1F4C2; Drop CSV / Excel or click to upload</h2>
+        <p>Needs a <strong>Company Name</strong> column &mdash; optional: Website, Sustainability URL</p>
+        <input type="file" id="fileIn" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+      </div>
+      <div style="text-align:center;padding-top:.5rem;">
+        <button class="btn primary" onclick="loadDemo()">&#x25B6; Load demo data</button>
+      </div>
+    </div>
+
+    <!-- Manual entry panel -->
+    <div id="panelManual" style="display:none;padding:1.25rem 1.5rem;">
+      <div style="max-width:560px;margin:0 auto;">
+        <p style="font-size:.78rem;color:var(--text3);margin-bottom:.75rem;">
+          One company per line. Optionally add a website after a comma or tab.<br>
+          <span style="color:var(--text3);opacity:.7;">e.g. &nbsp;<code style="font-family:var(--mono);font-size:.72rem;background:var(--bg3);padding:1px 5px;border-radius:3px;">Unilever</code> &nbsp;or&nbsp; <code style="font-family:var(--mono);font-size:.72rem;background:var(--bg3);padding:1px 5px;border-radius:3px;">BT Group, bt.com</code></span>
+        </p>
+        <textarea id="manualInput" placeholder="Unilever&#10;BT Group, bt.com&#10;Tesco&#10;HSBC&#10;Rolls-Royce Holdings"
+          style="width:100%;height:180px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-family:var(--mono);font-size:.8rem;padding:.75rem 1rem;outline:none;resize:vertical;line-height:1.6;"
+          onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();loadManualInput()}"
+          onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+        <div style="display:flex;gap:.6rem;margin-top:.75rem;align-items:center;">
+          <button class="btn primary" onclick="loadManualInput()" style="font-size:.8rem;padding:7px 18px;">
+            &#x25B6; Load companies
+          </button>
+          <span style="font-size:.72rem;color:var(--text3);" id="manualCount"></span>
+          <span style="font-size:.68rem;color:var(--text3);margin-left:auto;">Cmd/Ctrl+Enter to load</span>
+        </div>
       </div>
     </div>
   </div>
@@ -475,7 +489,7 @@ function hideAppUI() {
   document.getElementById('btnRun').style.display        = 'none';
   document.getElementById('btnClear').style.display      = 'none';
   document.getElementById('cfgBar').style.display        = 'none';
-  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('uploadSection').style.display = 'block'; toggleUploadSection(true);
   const tbody = document.getElementById('tBody');
   if (tbody) tbody.innerHTML = '';
 }
@@ -494,20 +508,18 @@ async function showProjectPicker() {
 
 async function renderProjectList() {
   const list = document.getElementById('projectList');
-  list.innerHTML = '<div style="color:var(--text3);font-size:.8rem;">Loading…</div>';
+  list.innerHTML = '<div style="color:var(--text3);font-size:.8rem;">Loading\u2026</div>';
   const { data, error } = await _supa.from('projects').select('*').order('created_at', { ascending: false });
   if (error) { list.innerHTML = '<div style="color:var(--red);font-size:.8rem;">Failed to load projects</div>'; return; }
   if (!data?.length) {
-    list.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:.5rem 0;">No projects yet — create one below</div>';
+    list.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:.5rem 0;">No projects yet \u2014 create one below</div>';
     return;
   }
-  // Fetch counts for all projects in one query
   const projectIds = data.map(p => p.id);
   const { data: countData } = await _supa
     .from('greenlens_results')
     .select('project_id, verified_by')
     .in('project_id', projectIds);
-
   const companyCounts = {}, verifiedCounts = {};
   (countData || []).forEach(row => {
     companyCounts[row.project_id] = (companyCounts[row.project_id] || 0) + 1;
@@ -517,28 +529,81 @@ async function renderProjectList() {
   list.innerHTML = data.map(p => {
     const total    = companyCounts[p.id] || 0;
     const verified = verifiedCounts[p.id] || 0;
+    const eName    = (p.name || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const eDesc    = (p.description || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     const countStr = total
       ? `<span style="font-size:.72rem;color:var(--text3);">${total} ${total===1?'company':'companies'}</span>`
-        + (verified ? `<span style="font-size:.72rem;color:var(--green);margin-left:.4rem;">· ${verified} verified</span>` : '')
-      : `<span style="font-size:.72rem;color:var(--text3);">Empty</span>`;
+        + (verified ? `<span style="font-size:.72rem;color:var(--green);margin-left:.4rem;">\xb7 ${verified} verified</span>` : '')
+      : '<span style="font-size:.72rem;color:var(--text3);">Empty</span>';
     return `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.7rem 1rem;cursor:pointer;transition:border-color .15s;"
-         onmouseover="this.style.borderColor='var(--sky)'" onmouseout="this.style.borderColor='var(--border2)'"
-         onclick="openProject('${p.id}','${p.name.replace(/'/g,"\\'")}')">
-      <div>
-        <div style="font-weight:600;color:var(--text1);font-size:.9rem;">${p.name}</div>
-        <div style="margin-top:3px;display:flex;gap:.3rem;align-items:center;">${countStr}</div>
-        <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">Created ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden;transition:border-color .15s;"
+         onmouseover="this.style.borderColor='var(--sky)'" onmouseout="this.style.borderColor='var(--border2)'" id="pcard_${p.id}">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.7rem 1rem;cursor:pointer;"
+           onclick="openProject('${p.id}','${eName}')">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;color:var(--text1);font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
+          ${p.description ? `<div style="font-size:.72rem;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.description}</div>` : ''}
+          <div style="margin-top:3px;display:flex;gap:.3rem;align-items:center;">${countStr}</div>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">Created ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-left:.75rem;flex-shrink:0;">
+          <span style="font-size:.75rem;color:var(--sky);">Open \u2192</span>
+          <button onclick="event.stopPropagation();toggleProjectEdit('${p.id}')"
+            style="background:none;border:1px solid var(--border2);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.68rem;padding:2px 7px;"
+            onmouseover="this.style.color='var(--text1)'" onmouseout="this.style.color='var(--text3)'">\u270f</button>
+          <button onclick="event.stopPropagation();deleteProject('${p.id}','${eName}',this)"
+            style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 6px;border-radius:4px;"
+            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715;</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:.5rem;">
-        <span style="font-size:.75rem;color:var(--sky);">Open →</span>
-        <button onclick="event.stopPropagation();deleteProject('${p.id}','${p.name.replace(/'/g,"\\'")}',this)"
-          style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 6px;border-radius:4px;"
-          onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">✕</button>
+      <div id="pedit_${p.id}" style="display:none;padding:.75rem 1rem 1rem;border-top:1px solid var(--border2);background:var(--bg2);">
+        <div style="font-size:.7rem;color:var(--text3);margin-bottom:.35rem;">Project name</div>
+        <input id="pname_${p.id}" value="${eName}"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.85rem;padding:.4rem .7rem;outline:none;box-sizing:border-box;margin-bottom:.65rem;"
+          onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
+          onkeydown="if(event.key==='Enter')saveProjectEdit('${p.id}')">
+        <div style="font-size:.7rem;color:var(--text3);margin-bottom:.35rem;">Description <span style="opacity:.6;">(optional)</span></div>
+        <textarea id="pdesc_${p.id}" rows="2" placeholder="e.g. FM suppliers for Langham Hotel \u2014 Q1 2025 review"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.8rem;padding:.4rem .7rem;outline:none;resize:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
+        >${eDesc}</textarea>
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.5rem;">
+          <button class="btn" onclick="toggleProjectEdit('${p.id}')" style="font-size:.72rem;">Cancel</button>
+          <button class="btn primary" onclick="saveProjectEdit('${p.id}')" style="font-size:.72rem;">Save</button>
+        </div>
       </div>
     </div>`;
   }).join('');
 }
+
+function toggleProjectEdit(id) {
+  const panel = document.getElementById('pedit_' + id);
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') {
+    const inp = document.getElementById('pname_' + id);
+    if (inp) { inp.focus(); inp.select(); }
+  }
+}
+
+async function saveProjectEdit(id) {
+  const nameEl = document.getElementById('pname_' + id);
+  const descEl = document.getElementById('pdesc_' + id);
+  const name = nameEl?.value.trim();
+  const desc = descEl?.value.trim() || null;
+  if (!name) { toast('Project name cannot be empty'); return; }
+  const { error } = await _supa.from('projects').update({ name, description: desc }).eq('id', id);
+  if (error) { toast('Failed to save: ' + error.message); return; }
+  if (_activeProject?.id === id) {
+    _activeProject.name = name;
+    localStorage.setItem('greenlens_project_name', name);
+    const label = document.getElementById('activeProjectName');
+    if (label) label.textContent = name;
+  }
+  await renderProjectList();
+  toast('Project updated');
+}
+
 
 async function createProject() {
   const name = document.getElementById('newProjectName').value.trim();
@@ -573,7 +638,7 @@ async function openProject(id, name) {
   document.getElementById('btnRun').style.display    = 'inline-block';
   document.getElementById('btnClear').style.display  = 'inline-block';
   document.getElementById('cfgBar').style.display    = 'flex';
-  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'block'; toggleUploadSection(false);
   const tbody = document.getElementById('tBody');
   if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text3);font-size:.82rem;">Loading ${name}…</td></tr>`;
   await loadResultsFromDb();
@@ -615,6 +680,8 @@ async function saveResultToDb(r) {
     user_notes: r.user_notes || null,
     manual_maturity_score: r.manual_maturity_score != null ? Number(r.manual_maturity_score) : null,
     manual_maturity_notes: r.manual_maturity_notes || null,
+    source_project_id:     r.source_project_id || null,
+    source_project_name:   r.source_project_name || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -642,6 +709,40 @@ async function saveUserFields(r) {
   }, { onConflict: 'project_id,company' });
 }
 
+// ── Save queue — prevents Supabase rate limit failures on large batches ─────
+// Saves are queued and processed one at a time with retry on failure
+const _saveQueue = [];
+let _saveRunning = false;
+
+function queueSave(r) {
+  // If same company already queued, replace with latest data
+  const existing = _saveQueue.findIndex(x => x.company === r.company);
+  if (existing >= 0) _saveQueue.splice(existing, 1);
+  _saveQueue.push({ ...r });
+  if (!_saveRunning) processSaveQueue();
+}
+
+async function processSaveQueue() {
+  if (_saveRunning || _saveQueue.length === 0) return;
+  _saveRunning = true;
+  while (_saveQueue.length > 0) {
+    const r = _saveQueue.shift();
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        await saveResultToDb(r);
+        break;
+      } catch(e) {
+        attempts++;
+        if (attempts < 3) await new Promise(res => setTimeout(res, 500 * attempts));
+      }
+    }
+    // Small gap between saves to avoid rate limiting
+    if (_saveQueue.length > 0) await new Promise(res => setTimeout(res, 80));
+  }
+  _saveRunning = false;
+}
+
 async function loadResultsFromDb() {
   if (!_supaUser || !_activeProject) return;
   const { data, error } = await _supa
@@ -665,7 +766,7 @@ async function loadResultsFromDb() {
   }
   // Always hide upload section when a project is open — results or not
   // Users add companies via the upload section only when they explicitly want to
-  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'block'; toggleUploadSection(false);
   document.getElementById('statsBar').style.display     = 'flex';
   document.getElementById('toolbar').style.display      = 'flex';
   document.getElementById('btnRun').style.display       = 'inline-block';
@@ -1884,6 +1985,22 @@ async function checkSMEHub(company) {
 }
 
 // ── Core processing ──────────────────────────────────────────────────────────
+async function findInOtherProjects(company) {
+  if (!_supaUser || !_activeProject) return null;
+  const { data } = await _supa
+    .from('greenlens_results')
+    .select('*, projects(name)')
+    .eq('company', company)
+    .neq('project_id', _activeProject.id)
+    .not('sustainability_url', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(1);
+  if (!data?.length) return null;
+  const r = data[0];
+  const srcName = r.projects?.name || r.source_project_name || 'another project';
+  return { ...r, source_project_name: srcName, source_project_id: r.project_id };
+}
+
 async function processOne(row) {
   const company = String(row['Company Name']||row['company']||'').trim();
   if (!company) return null;
@@ -1892,6 +2009,42 @@ async function processOne(row) {
   let website = (row['Website']||row['website']||cached?.website||'').replace(/^https?:\/\//,'').replace(/\/$/,'').trim();
 
   const base = { company, website, extraction_date: new Date().toISOString().slice(0,10) };
+
+  // ── Cross-project lookup — reuse existing data if found elsewhere ──────────
+  const crossMatch = await findInOtherProjects(company);
+  if (crossMatch) {
+    log('g', `  ✓ Found in project "${crossMatch.source_project_name}" — reusing data`);
+    const reused = {
+      ...base,
+      website:                  crossMatch.website || website,
+      status:                   crossMatch.status || 'Success',
+      sustainability_url:       crossMatch.sustainability_url,
+      sustainability_summary:   crossMatch.sustainability_summary,
+      net_zero_target_year:     crossMatch.net_zero_target_year,
+      net_zero_source:          crossMatch.net_zero_source,
+      net_zero_source_url:      crossMatch.net_zero_source_url,
+      emissions_reduction_target: crossMatch.emissions_reduction_target,
+      carbon_data:              crossMatch.carbon_data,
+      certifications:           crossMatch.certifications,
+      key_initiatives:          crossMatch.key_initiatives,
+      transition_plan_url:      crossMatch.transition_plan_url,
+      transition_plan_title:    crossMatch.transition_plan_title,
+      doc_confidence:           crossMatch.doc_confidence,
+      sbti_near_term_status:    crossMatch.sbti_near_term_status,
+      sbti_net_zero_status:     crossMatch.sbti_net_zero_status,
+      sbti_temperature:         crossMatch.sbti_temperature,
+      cdp_score:                crossMatch.cdp_score,
+      sme_hub_member:           crossMatch.sme_hub_member,
+      sme_hub_url:              crossMatch.sme_hub_url,
+      confidence:               crossMatch.confidence,
+      confidence_reasons:       crossMatch.confidence_reasons,
+      source_project_name:      crossMatch.source_project_name,
+      source_project_id:        crossMatch.source_project_id,
+      extraction_date:          crossMatch.extraction_date || base.extraction_date,
+    };
+    reused.maturity_score = calcMaturity(reused);
+    return reused;
+  }
 
   // Step 1: Website
   if (!website) {
@@ -2299,7 +2452,7 @@ async function reRunOne(idx, websiteOverride) {
       result._idx = idx;
       Object.assign(r, result);
       dbMerge(r);
-      saveResultToDb(r).catch(()=>{}); // persist to Supabase
+      queueSave(r); // persist to Supabase via queue
     }
   } catch(e) {
     log('r', `Error: ${e.message}`);
@@ -2501,7 +2654,7 @@ async function startRun() {
           result._idx = r._idx;
           Object.assign(r, result);
           dbMerge(r);
-          saveResultToDb(r).catch(()=>{}); // persist to Supabase
+          queueSave(r); // persist to Supabase via queue
         }
       } catch(e) {
         r.status = 'Website not found';
@@ -2646,7 +2799,7 @@ function loadRows(rows) {
       return base;
     }).filter(Boolean);
 
-  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'block'; toggleUploadSection(false);
   document.getElementById('statsBar').style.display     = 'flex';
   document.getElementById('toolbar').style.display      = 'flex';
   document.getElementById('btnRun').style.display       = 'inline-block';
@@ -2674,7 +2827,7 @@ function loadDemo() {
 
 function clearAll() {
   allResults = []; filteredResults = []; _rByIdx = {};
-  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('uploadSection').style.display = 'block'; toggleUploadSection(true);
   document.getElementById('statsBar').style.display     = 'none';
   document.getElementById('toolbar').style.display      = 'none';
   document.getElementById('btnClear').style.display     = 'none';
@@ -2899,6 +3052,7 @@ function renderTable(data) {
             style="background:none;border:none;cursor:pointer;color:var(--border2);font-size:.7rem;padding:0 2px;flex-shrink:0;line-height:1;margin-top:1px;"
             onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--border2)'">&#x2715;</button>
         </div>
+        ${r.source_project_name ? `<div style="margin-top:3px;"><span style="display:inline-flex;align-items:center;gap:2px;background:rgba(56,189,248,.1);color:var(--sky);border:1px solid rgba(56,189,248,.2);border-radius:3px;padding:1px 5px;font-size:.58rem;font-family:var(--mono);" title="Data reused from project: ${r.source_project_name} (originally run ${r.extraction_date||'unknown date'})">&#x29C9; ${r.source_project_name}</span></div>` : ''}
         <div class="td-sub">${websiteHtml}</div>
         ${r.status !== 'Running…' ? `
         <div class="rerun-wrap">
@@ -3327,6 +3481,18 @@ function openPanel(r) {
     </div>`;
   document.getElementById('pGrid').appendChild(reviewSection);
 
+  // Source project section
+  if (r.source_project_name) {
+    const srcDiv = document.createElement('div');
+    srcDiv.style.cssText = 'margin-top:.75rem;padding:.6rem .8rem;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);border-radius:8px;display:flex;align-items:center;gap:.5rem;';
+    srcDiv.innerHTML = `<span style="font-size:.75rem;">&#x29C9;</span>
+      <div>
+        <div style="font-size:.75rem;color:var(--sky);font-weight:600;">Data from: ${r.source_project_name}</div>
+        <div style="font-size:.68rem;color:var(--text3);margin-top:1px;">Originally analysed ${r.extraction_date ? new Date(r.extraction_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'unknown date'} · <a href="#" onclick="event.preventDefault();rerunFromPanel(${r._idx})" style="color:var(--sky);text-decoration:none;">Re-run fresh analysis</a></div>
+      </div>`;
+    document.getElementById('pGrid').prepend(srcDiv);
+  }
+
   document.getElementById('overlay').classList.add('open');
 }
 
@@ -3422,6 +3588,7 @@ function exportCsv() {
     ['user_notes',                'user_notes'],
     ['manual_maturity_score',     'manual_maturity_score'],
     ['manual_maturity_notes',     'manual_maturity_notes'],
+    ['source_project_name',        'source_project_name'],
   ];
   function csvCell(v) {
     if (v === null || v === undefined || v === '') return '';
@@ -3444,6 +3611,17 @@ function exportCsv() {
 document.addEventListener('DOMContentLoaded', () => { initAuth(); });
 
 // ── Input tab switching ────────────────────────────────────────────────────────
+function toggleUploadSection(forceOpen) {
+  const body  = document.getElementById('uploadBody');
+  const arrow = document.getElementById('uploadToggleArrow');
+  const hint  = document.getElementById('uploadHeaderHint');
+  const isOpen = body.style.display !== 'none';
+  const open = forceOpen !== undefined ? forceOpen : !isOpen;
+  body.style.display  = open ? 'block' : 'none';
+  arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(-90deg)';
+  if (hint) hint.style.display = open ? 'none' : 'inline';
+}
+
 function switchInputTab(tab) {
   const isFile = tab === 'file';
   document.getElementById('panelFile').style.display   = isFile ? 'block' : 'none';
