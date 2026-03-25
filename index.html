@@ -720,6 +720,7 @@ async function saveResultToDb(r) {
     manual_maturity_notes: r.manual_maturity_notes || null,
     source_project_id:     r.source_project_id || null,
     source_project_name:   r.source_project_name || null,
+    manual_assessment:     r.manual_assessment || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -840,6 +841,108 @@ async function loadCompanyAuditHistory(company) {
   return data || [];
 }
 
+
+// ── Manual assessment framework ───────────────────────────────────────────────
+const ASSESSMENT_QUESTIONS = [
+  {
+    id: 'carbon_measure',
+    q: 'Does the supplier measure carbon footprint?',
+    options: [
+      { label: 'No', score: 0 },
+      { label: 'Scope 1 & 2', score: 1 },
+      { label: 'Scope 1, 2 & Partial Scope 3', score: 2 },
+      { label: 'Full Scope 1, 2 & 3', score: 3 },
+    ]
+  },
+  {
+    id: 'ghg_protocol',
+    q: 'Has the carbon footprint been calculated using the GHG Protocol methodology?',
+    options: [
+      { label: 'No / unknown', score: 0 },
+      { label: 'Measured in line with GHG Protocol', score: 1 },
+      { label: 'Measured in line with GHG & 3rd party verified', score: 2 },
+    ]
+  },
+  {
+    id: 'targets',
+    q: 'Do they have carbon reduction or net zero targets?',
+    options: [
+      { label: 'None', score: 0 },
+      { label: 'Scope 1 & 2 near target', score: 1 },
+      { label: 'Scope 3 near target', score: 2 },
+      { label: 'Scope 1, 2 & 3 Net Zero target', score: 3 },
+    ]
+  },
+  {
+    id: 'sbti',
+    q: 'Are their targets SBTi aligned / validated?',
+    options: [
+      { label: 'No', score: 0 },
+      { label: 'SBTi aligned', score: 1 },
+      { label: 'SBTi validated directly', score: 2 },
+    ]
+  },
+  {
+    id: 'reductions',
+    q: 'Have they achieved any carbon reductions?',
+    options: [
+      { label: 'None', score: 0 },
+      { label: 'Some decarbonisation demonstrated', score: 1 },
+      { label: 'Scope 1 & 2 near target met', score: 2 },
+      { label: 'Scope 3 near target met', score: 3 },
+      { label: 'Net Zero target fully met', score: 4 },
+    ]
+  },
+  {
+    id: 'transition_plan',
+    q: 'Do they have a Net Zero transition plan?',
+    options: [
+      { label: 'No', score: 0 },
+      { label: 'Have a transition plan', score: 1 },
+      { label: 'TPT-aligned transition plan', score: 2 },
+    ]
+  },
+  {
+    id: 'disclosure',
+    q: 'Do they disclose progress against their targets / transition plan annually?',
+    options: [
+      { label: 'No', score: 0 },
+      { label: 'Annual carbon footprint', score: 1 },
+      { label: 'Annual progress against transition plan', score: 2 },
+    ]
+  },
+  {
+    id: 'initiatives',
+    q: 'Does the supplier have any other active sustainability initiatives?',
+    options: [
+      { label: 'None', score: 0 },
+      { label: 'Yes — wider ESG / sustainability initiatives implemented or in planning', score: 1 },
+      { label: 'Yes — have a sustainability / ESG strategy in place', score: 2 },
+    ]
+  },
+];
+
+function calcAssessmentScore(assessment) {
+  if (!assessment) return null;
+  const total = ASSESSMENT_QUESTIONS.reduce((sum, q) => {
+    const val = assessment[q.id];
+    if (val == null) return sum;
+    const opt = q.options[val];
+    return sum + (opt ? opt.score : 0);
+  }, 0);
+  return Math.min(total, 20);
+}
+
+function assessmentComplete(assessment) {
+  if (!assessment) return false;
+  return ASSESSMENT_QUESTIONS.every(q => assessment[q.id] != null);
+}
+
+function assessmentProgress(assessment) {
+  if (!assessment) return 0;
+  return ASSESSMENT_QUESTIONS.filter(q => assessment[q.id] != null).length;
+}
+
 function getInitials(email) {
   if (!email) return '?';
   const name = email.split('@')[0].replace(/[._-]+/g,' ').trim();
@@ -859,6 +962,7 @@ async function saveUserFields(r) {
     user_notes: r.user_notes || null,
     manual_maturity_score: r.manual_maturity_score != null ? Number(r.manual_maturity_score) : null,
     manual_maturity_notes: r.manual_maturity_notes || null,
+    manual_assessment:     r.manual_assessment || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -3257,7 +3361,7 @@ function renderTable(data) {
       <td>
         <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
         <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span>
-        ${r.manual_maturity_score != null ? `<div style="font-size:.65rem;color:var(--sky);margin-top:3px;font-family:var(--mono);">&#x270F; ${r.manual_maturity_score}/20</div>` : ''}
+        ${r.manual_maturity_score != null ? `<div style="font-size:.65rem;color:var(--sky);margin-top:3px;font-family:var(--mono);">&#x270F; ${r.manual_maturity_score}/20 <span style="color:var(--text3);font-family:var(--sans);">(${assessmentProgress(r.manual_assessment)}/8)</span></div>` : ''}
       </td>
       <td>
         <span class="td-summary" title="${safeNarrative}">${narrativeText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
@@ -3621,25 +3725,38 @@ function openPanel(r) {
       style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
       onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
     >${r.user_notes ? r.user_notes.replace(/</g,'&lt;') : ''}</textarea>
-
-    <div style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border1);">
-      <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Manual maturity score <span style="color:var(--text3);font-size:.68rem;">(0–20, shown alongside system score)</span></div>
-      <input id="manualScoreInput_${r._idx}" type="number" min="0" max="20" placeholder="e.g. 12"
-        value="${r.manual_maturity_score != null ? r.manual_maturity_score : ''}"
-        style="width:80px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.82rem;padding:.4rem .6rem;outline:none;font-family:var(--mono);"
-        onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'">
+    <div style="display:flex;justify-content:flex-end;margin-top:.4rem;">
+      <button id="notesSaveBtn_${r._idx}" class="btn primary" onclick="saveNotes(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save notes</button>
     </div>
 
-    <div style="margin-top:.75rem;">
-      <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Manual maturity notes <span style="color:var(--text3);font-size:.68rem;">(shown under maturity reason)</span></div>
-      <textarea id="manualNotesInput_${r._idx}" rows="2" placeholder="e.g. Score adjusted — verified SBTi targets not yet reflected in data"
-        style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
-        onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
-      >${r.manual_maturity_notes ? r.manual_maturity_notes.replace(/</g,'&lt;') : ''}</textarea>
-    </div>
-
-    <div style="display:flex;justify-content:flex-end;margin-top:.5rem;">
-      <button id="notesSaveBtn_${r._idx}" class="btn primary" onclick="saveNotes(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save</button>
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border1);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--text1);">Manual Maturity Assessment</div>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;" id="assessmentProgress_${r._idx}">${assessmentProgress(r.manual_assessment)}/8 questions answered</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--sky);" id="assessmentScore_${r._idx}">${r.manual_maturity_score != null ? r.manual_maturity_score + '/20' : '—'}</div>
+          <div style="font-size:.62rem;color:var(--text3);">manual score</div>
+        </div>
+      </div>
+      ${ASSESSMENT_QUESTIONS.map((q, qi) => {
+        const currentVal = r.manual_assessment ? r.manual_assessment[q.id] : undefined;
+        return `<div style="margin-bottom:.75rem;">
+          <div style="font-size:.72rem;color:var(--text2);margin-bottom:.3rem;line-height:1.4;">${q.q}</div>
+          <select id="aq_${r._idx}_${qi}" onchange="saveAssessment(${r._idx})"
+            style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.75rem;padding:.35rem .6rem;outline:none;"
+            onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'">
+            <option value="">— select —</option>
+            ${q.options.map((opt, oi) =>
+              `<option value="${oi}" ${currentVal === oi ? 'selected' : ''}>${opt.score} pts — ${opt.label}</option>`
+            ).join('')}
+          </select>
+        </div>`;
+      }).join('')}
+      <div style="display:flex;justify-content:flex-end;margin-top:.25rem;">
+        <button id="assessmentSaveBtn_${r._idx}" class="btn primary" onclick="saveAssessment(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save assessment</button>
+      </div>
     </div>`;
   document.getElementById('pGrid').appendChild(reviewSection);
 
@@ -3710,32 +3827,41 @@ function toggleVerified(idx) {
 function saveNotes(idx) {
   const r = _rByIdx[idx];
   if (!r) return;
-  const ta   = document.getElementById('notesInput_' + idx);
-  const ms   = document.getElementById('manualScoreInput_' + idx);
-  const mn   = document.getElementById('manualNotesInput_' + idx);
+  const ta = document.getElementById('notesInput_' + idx);
   const prevNotes = r.user_notes;
-  const prevScore = r.manual_maturity_score;
   if (ta) r.user_notes = ta.value.trim() || null;
-  if (ms) {
-    const val = ms.value.trim();
-    if (val === '') { r.manual_maturity_score = null; }
-    else {
-      const n = parseInt(val);
-      r.manual_maturity_score = (!isNaN(n) && n >= 0 && n <= 20) ? n : r.manual_maturity_score;
-    }
-  }
-  if (mn) r.manual_maturity_notes = mn.value.trim() || null;
-  // Audit: notes changed
   if (r.user_notes !== prevNotes)
     addAuditEntry('notes_saved', r.company, { note: r.user_notes || '(cleared)' });
-  // Audit: score changed
-  if (r.manual_maturity_score !== prevScore)
-    addAuditEntry('score_saved', r.company, { from: prevScore ?? '—', to: r.manual_maturity_score ?? '—' });
   dbMerge(r);
   saveUserFields(r).catch(() => {});
   applyFilters();
   const btn = document.getElementById('notesSaveBtn_' + idx);
-  if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save', 1500); }
+  if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save notes', 1500); }
+}
+
+function saveAssessment(idx) {
+  const r = _rByIdx[idx];
+  if (!r) return;
+  const prevScore = r.manual_maturity_score;
+  const assessment = {};
+  ASSESSMENT_QUESTIONS.forEach((q, qi) => {
+    const sel = document.getElementById(`aq_${idx}_${qi}`);
+    if (sel && sel.value !== '') assessment[q.id] = parseInt(sel.value);
+  });
+  r.manual_assessment = Object.keys(assessment).length ? assessment : null;
+  r.manual_maturity_score = calcAssessmentScore(r.manual_assessment);
+  if (r.manual_maturity_score !== prevScore)
+    addAuditEntry('score_saved', r.company, { from: prevScore ?? '—', to: r.manual_maturity_score ?? '—', via: 'assessment' });
+  dbMerge(r);
+  saveUserFields(r).catch(() => {});
+  applyFilters();
+  const prog = assessmentProgress(r.manual_assessment);
+  const scoreEl = document.getElementById('assessmentScore_' + idx);
+  if (scoreEl) { scoreEl.textContent = r.manual_maturity_score != null ? `${r.manual_maturity_score}/20` : '—'; }
+  const progEl = document.getElementById('assessmentProgress_' + idx);
+  if (progEl) progEl.textContent = `${prog}/8 questions answered`;
+  const btn = document.getElementById('assessmentSaveBtn_' + idx);
+  if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save assessment', 1500); }
 }
 
 // ── View toggle ────────────────────────────────────────────────────────────────
