@@ -721,6 +721,8 @@ async function saveResultToDb(r) {
     source_project_id:     r.source_project_id || null,
     source_project_name:   r.source_project_name || null,
     manual_assessment:     r.manual_assessment || null,
+    assessment_verified_by: r.assessment_verified_by || null,
+    assessment_verified_at: r.assessment_verified_at || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -940,7 +942,12 @@ function assessmentComplete(assessment) {
 
 function assessmentProgress(assessment) {
   if (!assessment) return 0;
+  // Count answered questions (0 counts as answered — it's an explicit selection)
   return ASSESSMENT_QUESTIONS.filter(q => assessment[q.id] != null).length;
+}
+
+function assessmentStarted(assessment) {
+  return assessment && Object.keys(assessment).length > 0;
 }
 
 function getInitials(email) {
@@ -963,6 +970,8 @@ async function saveUserFields(r) {
     manual_maturity_score: r.manual_maturity_score != null ? Number(r.manual_maturity_score) : null,
     manual_maturity_notes: r.manual_maturity_notes || null,
     manual_assessment:     r.manual_assessment || null,
+    assessment_verified_by: r.assessment_verified_by || null,
+    assessment_verified_at: r.assessment_verified_at || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id,company' });
 }
@@ -3359,9 +3368,15 @@ function renderTable(data) {
       </td>
       <td class="td-mono" style="font-size:.72rem;color:var(--text2);max-width:180px;">${r.certifications ? r.certifications.replace(/</g,'&lt;') : '<span class="td-na">&#x2014;</span>'}</td>
       <td>
+        <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">AI</div>
         <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
         <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span>
-        ${r.manual_maturity_score != null ? `<div style="font-size:.65rem;color:var(--sky);margin-top:3px;font-family:var(--mono);">&#x270F; ${r.manual_maturity_score}/20 <span style="color:var(--text3);font-family:var(--sans);">(${assessmentProgress(r.manual_assessment)}/8)</span></div>` : ''}
+        ${r.manual_maturity_score != null ? `
+        <div style="margin-top:4px;font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Verified</div>
+        <div style="font-size:.75rem;font-family:var(--mono);font-weight:600;color:var(--sky);">${r.manual_maturity_score}/20
+          <span style="color:var(--text3);font-family:var(--sans);font-size:.6rem;">${assessmentProgress(r.manual_assessment)}/8</span>
+          ${r.assessment_verified_by ? `<span style="font-size:.6rem;color:var(--green);font-family:var(--sans);margin-left:3px;">✓${getInitials(r.assessment_verified_by)}</span>` : ''}
+        </div>` : ''}
       </td>
       <td>
         <span class="td-summary" title="${safeNarrative}">${narrativeText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
@@ -3682,9 +3697,37 @@ function openPanel(r) {
   const initiativesSection = pSection('🌱', 'Initiatives') +
     `<div class="full"><div class="pf-label">Summary</div><div class="pf-value">${summaryHtml}${initItems ? `<div style="margin-top:4px;">${initItems}</div>` : r.sustainability_summary ? '' : '<div style="font-size:.75rem;color:var(--text3);font-style:italic;margin-top:4px;">No initiatives extracted.</div>'}</div></div>`;
 
+  // Build verified maturity score display for panel top
+  const verifiedScoreDisplay = (() => {
+    const ms = r.manual_maturity_score;
+    const vBy = r.assessment_verified_by;
+    const vAt = r.assessment_verified_at;
+    const prog = assessmentProgress(r.manual_assessment);
+    if (ms == null && !vBy) return `<div style="color:var(--text3);font-size:.78rem;font-style:italic;">Not yet assessed</div>`;
+    const verifiedBadge = vBy
+      ? `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:4px;padding:2px 7px;font-size:.62rem;color:var(--green);">
+          ✓ ${getInitials(vBy)} · ${new Date(vAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+         </div>`
+      : '';
+    return `<div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--sky);">${ms != null ? ms : '—'}/20</div>
+            <div style="font-size:.65rem;color:var(--text3);margin-top:2px;">${prog}/8 questions answered</div>
+            ${verifiedBadge}`;
+  })();
+
   document.getElementById('pGrid').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem;">
+      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
+        <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">AI Maturity Score</div>
+        <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
+        <div><span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);font-size:.58rem;margin-top:4px;">${mLabel}</span></div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
+        <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">Verified Maturity Score</div>
+        ${verifiedScoreDisplay}
+      </div>
+    </div>
     ${pf('Status', sBadge(r.status))}
-    ${pf('Maturity', maturityDisplay, true)}
+    ${pf('AI Maturity Detail', maturityDisplay, true)}
     ${carbonSection}
     ${netZeroSection}
     ${certSection}
@@ -3732,12 +3775,15 @@ function openPanel(r) {
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border1);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
         <div>
-          <div style="font-size:.75rem;font-weight:600;color:var(--text1);">Manual Maturity Assessment</div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--text1);">Verified Maturity Assessment</div>
           <div style="font-size:.68rem;color:var(--text3);margin-top:2px;" id="assessmentProgress_${r._idx}">${assessmentProgress(r.manual_assessment)}/8 questions answered</div>
+          <div id="assessmentStamp_${r._idx}" style="margin-top:3px;">${r.assessment_verified_by
+            ? `<div style="display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:4px;padding:2px 7px;font-size:.62rem;color:var(--green);">✓ ${r.assessment_verified_by} · ${new Date(r.assessment_verified_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>`
+            : `<div style="font-size:.65rem;color:var(--text3);">Not yet verified — changes auto-verify</div>`}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--sky);" id="assessmentScore_${r._idx}">${r.manual_maturity_score != null ? r.manual_maturity_score + '/20' : '—'}</div>
-          <div style="font-size:.62rem;color:var(--text3);">manual score</div>
+          <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--sky);" id="assessmentScore_${r._idx}">${r.manual_maturity_score != null ? r.manual_maturity_score + '/20' : '0/20'}</div>
+          <div style="font-size:.62rem;color:var(--text3);">verified score</div>
         </div>
       </div>
       ${ASSESSMENT_QUESTIONS.map((q, qi) => {
@@ -3747,9 +3793,8 @@ function openPanel(r) {
           <select id="aq_${r._idx}_${qi}" onchange="saveAssessment(${r._idx})"
             style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.75rem;padding:.35rem .6rem;outline:none;"
             onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'">
-            <option value="">— select —</option>
             ${q.options.map((opt, oi) =>
-              `<option value="${oi}" ${currentVal === oi ? 'selected' : ''}>${opt.score} pts — ${opt.label}</option>`
+              `<option value="${oi}" ${(currentVal === oi || (currentVal === undefined && oi === 0)) ? 'selected' : ''}>${opt.score} pts — ${opt.label}</option>`
             ).join('')}
           </select>
         </div>`;
@@ -3850,6 +3895,9 @@ function saveAssessment(idx) {
   });
   r.manual_assessment = Object.keys(assessment).length ? assessment : null;
   r.manual_maturity_score = calcAssessmentScore(r.manual_assessment);
+  // Auto-verify when any answer changes
+  r.assessment_verified_by = _supaUser?.email || null;
+  r.assessment_verified_at = new Date().toISOString();
   if (r.manual_maturity_score !== prevScore)
     addAuditEntry('score_saved', r.company, { from: prevScore ?? '—', to: r.manual_maturity_score ?? '—', via: 'assessment' });
   dbMerge(r);
@@ -3857,9 +3905,14 @@ function saveAssessment(idx) {
   applyFilters();
   const prog = assessmentProgress(r.manual_assessment);
   const scoreEl = document.getElementById('assessmentScore_' + idx);
-  if (scoreEl) { scoreEl.textContent = r.manual_maturity_score != null ? `${r.manual_maturity_score}/20` : '—'; }
+  if (scoreEl) { scoreEl.textContent = `${r.manual_maturity_score != null ? r.manual_maturity_score : 0}/20`; }
   const progEl = document.getElementById('assessmentProgress_' + idx);
   if (progEl) progEl.textContent = `${prog}/8 questions answered`;
+  // Refresh verification stamp
+  const stampEl = document.getElementById('assessmentStamp_' + idx);
+  if (stampEl && r.assessment_verified_by) {
+    stampEl.innerHTML = `<div style="display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:4px;padding:2px 7px;font-size:.62rem;color:var(--green);">✓ ${r.assessment_verified_by} · ${new Date(r.assessment_verified_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>`;
+  }
   const btn = document.getElementById('assessmentSaveBtn_' + idx);
   if (btn) { btn.textContent = '✓ Saved'; setTimeout(() => btn.textContent = 'Save assessment', 1500); }
 }
