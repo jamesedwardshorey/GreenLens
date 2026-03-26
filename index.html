@@ -1125,19 +1125,22 @@ function saveSettings() {
 // ── AI helper — proxied through Supabase Edge Function ───────────────────
 async function aiAsk(prompt, maxTokens=400) {
   try {
-    const r = await fetch('https://pfpyxhdjrkvfkwcczerq.supabase.co/functions/v1/ai-proxy', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmcHl4aGRqcmt2Zmt3Y2N6ZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTE2NTQsImV4cCI6MjA4OTg2NzY1NH0.qFluwn9mFN15yAGE3e0rj__stDTiq8Kdoj9ECiW7eQ4`,
+    const r = await fetchWithTimeout(
+      'https://pfpyxhdjrkvfkwcczerq.supabase.co/functions/v1/ai-proxy',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmcHl4aGRqcmt2Zmt3Y2N6ZXJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTE2NTQsImV4cCI6MjA4OTg2NzY1NH0.qFluwn9mFN15yAGE3e0rj__stDTiq8Kdoj9ECiW7eQ4`,
+        },
+        body: JSON.stringify({
+          model: aiConfig.model,
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+        }),
       },
-      body: JSON.stringify({
-        model: aiConfig.model,
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: AbortSignal.timeout(25000),
-    });
+      25000
+    );
     if (!r.ok) {
       log('a', `  AI proxy error: ${r.status}`);
       return null;
@@ -1697,12 +1700,11 @@ async function multiSearch(query, targetDomain) {
   // Try DDG first (HTML endpoint via POST - most reliable if CORS works)
   const ddgPost = async () => {
     try {
-      const r = await fetch('https://html.duckduckgo.com/html/', {
+      const r = await fetchWithTimeout('https://html.duckduckgo.com/html/', {
         method:'POST', mode:'cors',
         headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'text/html'},
         body:'q='+encodeURIComponent(query)+'&kl=uk-en&kp=-1',
-        signal: AbortSignal.timeout(8000),
-      });
+      }, 8000);
       if (r.ok) {
         const html = await r.text();
         const urls = extractUrlsFromHtml(html, targetDomain);
@@ -2309,7 +2311,11 @@ async function processOne(row) {
   const base = { company, website, extraction_date: new Date().toISOString().slice(0,10) };
 
   // ── Cross-project lookup — reuse existing data if found elsewhere ──────────
-  const crossMatch = await findInOtherProjects(company);
+  // Wrap in timeout — a hung Supabase connection should not stall the worker
+  const crossMatch = await Promise.race([
+    findInOtherProjects(company),
+    new Promise(resolve => setTimeout(() => resolve(null), 5000))
+  ]);
   if (crossMatch) {
     log('g', `  ✓ Found in project "${crossMatch.source_project_name}" — reusing data`);
     const reused = {
@@ -2953,7 +2959,7 @@ async function startRun() {
         // Per-company timeout — prevents a single hung request from stalling a worker
         const result = await Promise.race([
           processOne({ 'Company Name': r.company, Website: r.website||'' }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out after 60s')), 60000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out after 90s')), 90000))
         ]);
         if (result) {
           result._idx = r._idx;
