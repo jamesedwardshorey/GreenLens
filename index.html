@@ -291,18 +291,17 @@ tr:hover td{background:rgba(255,255,255,.015);}
 <div class="tbl-wrap" id="tableView" style="display:none">
   <table>
     <thead><tr>
-      <th onclick="colSortBy('verified')" class="th-sort" style="width:60px;text-align:center;" title="Verification">Verified <span class="sort-arrow" id="sa-verified"></span></th>
-      <th onclick="colSortBy('name')" class="th-sort">Company <span class="sort-arrow" id="sa-name"></span></th>
-      <th onclick="colSortBy('status')" class="th-sort">Status <span class="sort-arrow" id="sa-status"></span></th>
-      <th onclick="colSortBy('suspage')" class="th-sort">Sustainability Page <span class="sort-arrow" id="sa-suspage"></span></th>
-      <th onclick="colSortBy('nz')" class="th-sort">Net Zero <span class="sort-arrow" id="sa-nz"></span></th>
-      <th onclick="colSortBy('summary')" class="th-sort">Summary <span class="sort-arrow" id="sa-summary"></span></th>
-      <th onclick="colSortBy('certs')" class="th-sort">Certifications <span class="sort-arrow" id="sa-certs"></span></th>
-      <th onclick="colSortBy('maturity')" class="th-sort">Maturity <span class="sort-arrow" id="sa-maturity"></span></th>
-      <th onclick="colSortBy('reason')" class="th-sort">Maturity Reason <span class="sort-arrow" id="sa-reason"></span></th>
-      <th onclick="colSortBy('date')" class="th-sort">Last Run <span class="sort-arrow" id="sa-date"></span></th>
-      <th onclick="colSortBy('doc')" class="th-sort">Sustainability Document <span class="sort-arrow" id="sa-doc"></span></th>
-      <th onclick="colSortBy('confidence')" class="th-sort">Confidence <span class="sort-arrow" id="sa-confidence"></span></th>
+      <th onclick="colSortBy('verified')" class="th-sort" style="width:52px;text-align:center;" title="Verification">&#x2714; <span class="sort-arrow" id="sa-verified"></span></th>
+      <th onclick="colSortBy('name')" class="th-sort" style="min-width:160px;">Company <span class="sort-arrow" id="sa-name"></span></th>
+      <th onclick="colSortBy('suspage')" class="th-sort" style="min-width:180px;">Sustainability Page <span class="sort-arrow" id="sa-suspage"></span></th>
+      <th onclick="colSortBy('carbon')" class="th-sort" style="min-width:160px;">Carbon Data <span class="sort-arrow" id="sa-carbon"></span></th>
+      <th onclick="colSortBy('nz')" class="th-sort" style="min-width:160px;">Net Zero <span class="sort-arrow" id="sa-nz"></span></th>
+      <th onclick="colSortBy('doc')" class="th-sort" style="min-width:150px;">Document <span class="sort-arrow" id="sa-doc"></span></th>
+      <th onclick="colSortBy('certs')" class="th-sort" style="min-width:150px;">Certifications &amp; Initiatives <span class="sort-arrow" id="sa-certs"></span></th>
+      <th onclick="colSortBy('progress')" class="th-sort" style="min-width:150px;">Progress <span class="sort-arrow" id="sa-progress"></span></th>
+      <th onclick="colSortBy('date')" class="th-sort" style="min-width:80px;">Last Run <span class="sort-arrow" id="sa-date"></span></th>
+      <th onclick="colSortBy('confidence')" class="th-sort" style="min-width:90px;">Confidence <span class="sort-arrow" id="sa-confidence"></span></th>
+      <th onclick="colSortBy('maturity')" class="th-sort" style="min-width:140px;">Maturity Scores <span class="sort-arrow" id="sa-maturity"></span></th>
     </tr></thead>
     <tbody id="tBody"></tbody>
   </table>
@@ -351,6 +350,8 @@ tr:hover td{background:rgba(255,255,255,.015);}
     <div class="pf-label">Sustainability Page</div>
     <div id="pUrl" style="font-size:.82rem;margin-bottom:.6rem;word-break:break-all;"></div>
     <div id="pRerun" style="margin-bottom:1rem;display:none;"></div>
+    <!-- Score cards — always full width, outside the 2-col grid -->
+    <div id="pScoreCards" style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1rem;"></div>
     <div id="pGrid"></div>
   </div>
 </div>
@@ -3188,6 +3189,8 @@ function sortResults(data) {
     switch(key) {
       case 'verified': return flip*((a.verified_by ? 1 : 0) - (b.verified_by ? 1 : 0));
       case 'name':     return flip*(a.company||'').localeCompare(b.company||'');
+      case 'carbon':   return flip*((a.carbon_data ? 1 : 0) - (b.carbon_data ? 1 : 0));
+      case 'progress': return flip*((a.emissions_reduction_target ? 1 : 0) - (b.emissions_reduction_target ? 1 : 0));
       case 'status':   return flip*(a.status||'').localeCompare(b.status||'');
       case 'suspage':  return flip*((a.sustainability_url?1:0)-(b.sustainability_url?1:0));
       case 'nz':       return flip*((a.net_zero_target_year||9999)-(b.net_zero_target_year||9999));
@@ -3366,12 +3369,31 @@ function renderTable(data) {
       return '';
     })();
 
+    // Helper: get assessment answer label for a question
+    const aq = (qId) => {
+      const q = ASSESSMENT_QUESTIONS.find(q => q.id === qId);
+      if (!q || !r.manual_assessment || r.manual_assessment[qId] == null) return null;
+      return q.options[r.manual_assessment[qId]]?.label || null;
+    };
+    // Helper: render an assessment answer pill
+    const aqPill = (qId) => {
+      const label = aq(qId);
+      if (!label) return '';
+      const isZero = r.manual_assessment[qId] === 0;
+      const c = isZero ? 'var(--text3)' : 'var(--sky)';
+      const bg = isZero ? 'rgba(255,255,255,.04)' : 'rgba(56,189,248,.1)';
+      const border = isZero ? 'var(--border2)' : 'rgba(56,189,248,.25)';
+      return `<div style="margin-top:3px;font-size:.62rem;color:${c};background:${bg};border:1px solid ${border};border-radius:3px;padding:1px 5px;line-height:1.4;">${label}</div>`;
+    };
+
     tr.innerHTML = `
       <td style="text-align:center;vertical-align:middle;cursor:pointer;" onclick="event.stopPropagation();toggleVerified(${r._idx})" title="${r.verified_by ? 'Verified by ' + r.verified_by + ' on ' + new Date(r.verified_at).toLocaleDateString('en-GB') + ' — click to clear' : 'Click to mark as verified'}">
         ${r.verified_by
           ? `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:4px;padding:2px 5px;font-size:.62rem;font-weight:600;font-family:var(--mono);white-space:nowrap;">${getInitials(r.verified_by)} ${new Date(r.verified_at).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'}).replace('/','/')}</span>`
           : `<span style="display:inline-block;width:28px;height:18px;border:1px dashed var(--border2);border-radius:4px;"></span>`}
       </td>
+
+      <!-- Company + website -->
       <td onclick="event.stopPropagation()">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
           <div class="td-co" title="${r.company}" style="cursor:pointer;flex:1;" onclick="openPanel(_rByIdx[${r._idx}])">${r.company||'&#x2014;'}</div>
@@ -3379,62 +3401,88 @@ function renderTable(data) {
             style="background:none;border:none;cursor:pointer;color:var(--border2);font-size:.7rem;padding:0 2px;flex-shrink:0;line-height:1;margin-top:1px;"
             onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--border2)'">&#x2715;</button>
         </div>
-        ${r.source_project_name ? `<div style="margin-top:3px;"><span style="display:inline-flex;align-items:center;gap:2px;background:rgba(56,189,248,.1);color:var(--sky);border:1px solid rgba(56,189,248,.2);border-radius:3px;padding:1px 5px;font-size:.58rem;font-family:var(--mono);" title="Data reused from project: ${r.source_project_name} (originally run ${r.extraction_date||'unknown date'})">&#x29C9; ${r.source_project_name}</span></div>` : ''}
+        ${r.source_project_name ? `<div style="margin-top:2px;"><span style="display:inline-flex;align-items:center;gap:2px;background:rgba(56,189,248,.1);color:var(--sky);border:1px solid rgba(56,189,248,.2);border-radius:3px;padding:1px 5px;font-size:.58rem;font-family:var(--mono);" title="Data reused from project: ${r.source_project_name}">&#x29C9; ${r.source_project_name}</span></div>` : ''}
         <div class="td-sub">${websiteHtml}</div>
         ${r.status === 'Website not found' && r.status !== 'Running…' ? `
         <div class="rerun-wrap" style="margin-top:4px;">
-          <input class="rerun-input" id="ri_${r._idx}" placeholder="enter website…"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}"
-            onclick="event.stopPropagation()">
+          <input class="rerun-input" id="ri_${r._idx}" placeholder="enter website…" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}" onclick="event.stopPropagation()">
           <button class="rerun-btn" id="rb_${r._idx}" onclick="event.stopPropagation();triggerRerun(${r._idx})">&#x21BA;</button>
         </div>` : r.status !== 'Running…' ? `
         <div class="rerun-wrap" style="margin-top:4px;">
-          <input class="rerun-input" id="ri_${r._idx}" placeholder="enter new website…"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}"
-            onclick="event.stopPropagation()" style="width:100px;">
+          <input class="rerun-input" id="ri_${r._idx}" placeholder="new website…" style="width:95px;" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}" onclick="event.stopPropagation()">
           <button class="rerun-btn" id="rb_${r._idx}" onclick="event.stopPropagation();triggerRerun(${r._idx})">&#x21BA;</button>
         </div>` : `<div style="font-family:var(--mono);font-size:.63rem;color:var(--text3);margin-top:3px;">&#x23F3; running…</div>`}
       </td>
+
+      <!-- Sustainability page + summary -->
       <td onclick="event.stopPropagation()">
         ${sBadge(r.status)}
-      </td>
-      <td onclick="event.stopPropagation()">
-        ${susLink}
+        ${susLink ? `<div style="margin-top:3px;">${susLink}</div>` : ''}
+        ${summaryText ? `<div style="margin-top:4px;"><span class="td-summary" title="${safeSummary}">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></div>` : ''}
+        ${r.user_notes ? `<div style="font-size:.68rem;color:var(--sky);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${r.user_notes.replace(/"/g,'&quot;')}">&#x270F; ${r.user_notes.replace(/</g,'&lt;')}</div>` : ''}
         ${r.status === 'Sustainability page not found' && r.status !== 'Running…' ? `
-        <div style="margin-top:5px;" onclick="event.stopPropagation()">
+        <div style="margin-top:5px;">
           <a href="${susSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;display:block;margin-bottom:3px;">&#x1F50D; Find sus page</a>
           <div class="rerun-wrap">
-            <input class="rerun-input" id="sri_${r._idx}" placeholder="paste URL…" style="width:100px;font-size:.6rem;"
-              onkeydown="if(event.key==='Enter'){event.preventDefault();triggerSusRerun(${r._idx})}"
-              onclick="event.stopPropagation()">
+            <input class="rerun-input" id="sri_${r._idx}" placeholder="paste URL…" style="width:100px;font-size:.6rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerSusRerun(${r._idx})}" onclick="event.stopPropagation()">
             <button class="rerun-btn" id="srb_${r._idx}" onclick="event.stopPropagation();triggerSusRerun(${r._idx})">&#x21BA;</button>
           </div>
         </div>` : ''}
       </td>
-      <td class="td-mono" onclick="event.stopPropagation()">${nzCell}</td>
+
+      <!-- Carbon data -->
       <td>
-        ${summaryText ? `<span class="td-summary" title="${safeSummary}">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : '<span class="td-na">&#x2014;</span>'}
-        ${r.user_notes ? `<div style="font-size:.68rem;color:var(--sky);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${r.user_notes.replace(/"/g,'&quot;')}">&#x270F; ${r.user_notes.replace(/</g,'&lt;')}</div>` : ''}
+        ${r.carbon_data ? `<div style="font-size:.72rem;color:var(--text2);line-height:1.4;">${r.carbon_data.replace(/</g,'&lt;')}</div>` : '<span class="td-na">&#x2014;</span>'}
+        ${aqPill('carbon_measure')}
+        ${aqPill('ghg_protocol')}
       </td>
-      <td class="td-mono" style="font-size:.72rem;color:var(--text2);max-width:180px;">${r.certifications ? r.certifications.replace(/</g,'&lt;') : '<span class="td-na">&#x2014;</span>'}</td>
+
+      <!-- Net zero -->
+      <td onclick="event.stopPropagation()">
+        ${nzCell}
+        ${aqPill('targets')}
+        ${aqPill('sbti')}
+      </td>
+
+      <!-- Document -->
+      <td onclick="event.stopPropagation()">
+        ${planCell}
+        ${aqPill('transition_plan')}
+        ${aqPill('disclosure')}
+      </td>
+
+      <!-- Certifications + initiatives -->
+      <td>
+        ${r.certifications ? `<div style="font-size:.7rem;color:var(--text2);line-height:1.4;">${r.certifications.replace(/</g,'&lt;')}</div>` : '<span class="td-na">&#x2014;</span>'}
+        ${aqPill('initiatives')}
+      </td>
+
+      <!-- Progress -->
+      <td>
+        ${r.emissions_reduction_target ? `<div style="font-size:.72rem;color:var(--text2);line-height:1.4;">${r.emissions_reduction_target.replace(/</g,'&lt;')}</div>` : '<span class="td-na">&#x2014;</span>'}
+        ${aqPill('reductions')}
+        ${aqPill('disclosure')}
+      </td>
+
+      <!-- Last run -->
+      <td style="font-size:.7rem;color:var(--text3);font-family:var(--mono);">${r.extraction_date||'&#x2014;'}</td>
+
+      <!-- Confidence -->
+      <td style="min-width:120px;">${confidenceCell(r)}</td>
+
+      <!-- Maturity scores -->
       <td>
         <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">AI</div>
         <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
         <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span>
         ${r.manual_maturity_score != null ? `
-        <div style="margin-top:4px;font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Verified</div>
-        <div style="font-size:.75rem;font-family:var(--mono);font-weight:600;color:var(--sky);">${r.manual_maturity_score}/20
-          <span style="color:var(--text3);font-family:var(--sans);font-size:.6rem;">${assessmentProgress(r.manual_assessment)}/8</span>
-          ${r.assessment_verified_by ? `<span style="font-size:.6rem;color:var(--green);font-family:var(--sans);margin-left:3px;">✓${getInitials(r.assessment_verified_by)}</span>` : ''}
+        <div style="margin-top:5px;padding-top:5px;border-top:1px solid var(--border1);">
+          <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Verified</div>
+          <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--sky);">${r.manual_maturity_score}/20</span>
+          <span style="font-size:.6rem;color:var(--text3);margin-left:3px;">${assessmentProgress(r.manual_assessment)}/8</span>
+          ${r.assessment_verified_by ? `<div style="font-size:.6rem;color:var(--green);margin-top:1px;">✓ ${getInitials(r.assessment_verified_by)}</div>` : ''}
         </div>` : ''}
       </td>
-      <td>
-        <span class="td-summary" title="${safeNarrative}">${narrativeText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
-        ${r.manual_maturity_notes ? `<div style="font-size:.68rem;color:var(--sky);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${r.manual_maturity_notes.replace(/"/g,'&quot;')}">&#x270F; ${r.manual_maturity_notes.replace(/</g,'&lt;')}</div>` : ''}
-      </td>
-      <td class="td-mono" style="font-size:.7rem;color:var(--text3);">${r.extraction_date||'&#x2014;'}</td>
-      <td onclick="event.stopPropagation()">${planCell}</td>
-      <td style="min-width:120px;">${confidenceCell(r)}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -3788,18 +3836,19 @@ function openPanel(r) {
             ${verifiedBadge}`;
   })();
 
-  document.getElementById('pGrid').innerHTML = `
-    <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem;">
-      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
-        <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">AI Maturity Score</div>
-        <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
-        <div><span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);font-size:.58rem;margin-top:4px;">${mLabel}</span></div>
-      </div>
-      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
-        <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">Verified Maturity Score</div>
-        ${verifiedScoreDisplay}
-      </div>
+  // ── Score cards — injected above pGrid into their own container ─────────────
+  document.getElementById('pScoreCards').innerHTML = `
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">AI Maturity Score</div>
+      <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
+      <div><span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);font-size:.58rem;margin-top:4px;">${mLabel}</span></div>
     </div>
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">Verified Maturity Score</div>
+      ${verifiedScoreDisplay}
+    </div>`;
+
+  document.getElementById('pGrid').innerHTML = `
     ${pf('Status', sBadge(r.status), true)}
     ${pf('AI Maturity Detail', maturityDisplay, true)}
     ${carbonSection}
