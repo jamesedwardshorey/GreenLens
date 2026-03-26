@@ -26,6 +26,7 @@ a{color:inherit;}
 .upload-zone p{font-size:.75rem;color:var(--text3);}
 .stats-bar{display:flex;gap:1rem;padding:.55rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border1);flex-wrap:wrap;}
 .stat{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.stat-sep{width:1px;background:var(--border2);align-self:stretch;margin:0 .15rem;}
 .stat-n{font-family:var(--mono);font-size:1.05rem;font-weight:700;}
 .stat-l{font-size:.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
 .prog-wrap{padding:.5rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border1);display:none;}
@@ -225,11 +226,21 @@ tr:hover td{background:rgba(255,255,255,.015);}
   </div>
 </div>
 <div class="stats-bar" id="statsBar" style="display:none">
-  <div class="stat"><div class="stat-n" id="sTotal" style="color:var(--sky)">0</div><div class="stat-l">Total</div></div>
-  <div class="stat"><div class="stat-n" id="sOK" style="color:var(--green)">0</div><div class="stat-l">Success</div></div>
-  <div class="stat"><div class="stat-n" id="sNZ" style="color:var(--lime)">0</div><div class="stat-l">Net Zero</div></div>
-  <div class="stat"><div class="stat-n" id="sSBTi" style="color:var(--violet)">0</div><div class="stat-l">SBTi</div></div>
-  <div class="stat"><div class="stat-n" id="sAvgMat" style="color:var(--amber)">&#x2014;</div><div class="stat-l">Avg Maturity</div></div>
+  <div class="stat" title="Total companies in this project"><div class="stat-n" id="sTotal" style="color:var(--sky)">0</div><div class="stat-l">Total</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat" title="Website found"><div class="stat-n" id="sWeb" style="color:var(--text1)">0</div><div class="stat-l">Websites</div></div>
+  <div class="stat" title="Sustainability page found"><div class="stat-n" id="sSus" style="color:var(--green)">0</div><div class="stat-l">Sus Pages</div></div>
+  <div class="stat" title="Net zero target found"><div class="stat-n" id="sNZ" style="color:var(--lime)">0</div><div class="stat-l">Net Zero</div></div>
+  <div class="stat" title="Sustainability document found"><div class="stat-n" id="sDoc" style="color:var(--amber)">0</div><div class="stat-l">Documents</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat" title="SBTi targets set"><div class="stat-n" id="sSBTi" style="color:var(--violet)">0</div><div class="stat-l">SBTi</div></div>
+  <div class="stat" title="CDP score recorded"><div class="stat-n" id="sCDP" style="color:var(--violet)">0</div><div class="stat-l">CDP</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat" title="Average AI maturity score"><div class="stat-n" id="sAvgMat" style="color:var(--amber)">&#x2014;</div><div class="stat-l">Avg AI Score</div></div>
+  <div class="stat" title="Average verified maturity score (assessed companies only)"><div class="stat-n" id="sAvgVerified" style="color:var(--sky)">&#x2014;</div><div class="stat-l">Avg Verified</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat" title="Companies marked as verified by a user"><div class="stat-n" id="sVerified" style="color:var(--green)">0</div><div class="stat-l">Verified</div></div>
+  <div class="stat" title="Companies with a completed manual assessment"><div class="stat-n" id="sAssessed" style="color:var(--sky)">0</div><div class="stat-l">Assessed</div></div>
   <div style="flex:1"></div>
   <button class="btn primary" id="btnRun" onclick="startRun()" style="display:none">&#x25B6; Run Analysis</button>
   <button class="btn danger" id="btnCancel" onclick="cancelRun()" style="display:none">&#x2715; Cancel</button>
@@ -3370,38 +3381,36 @@ function renderTable(data) {
         </div>
         ${r.source_project_name ? `<div style="margin-top:3px;"><span style="display:inline-flex;align-items:center;gap:2px;background:rgba(56,189,248,.1);color:var(--sky);border:1px solid rgba(56,189,248,.2);border-radius:3px;padding:1px 5px;font-size:.58rem;font-family:var(--mono);" title="Data reused from project: ${r.source_project_name} (originally run ${r.extraction_date||'unknown date'})">&#x29C9; ${r.source_project_name}</span></div>` : ''}
         <div class="td-sub">${websiteHtml}</div>
-        ${r.status !== 'Running…' ? `
-        <div class="rerun-wrap">
-          <input class="rerun-input" id="ri_${r._idx}" placeholder="${r.website ? 'enter new website…' : 'enter website…'}"
+        ${r.status === 'Website not found' && r.status !== 'Running…' ? `
+        <div class="rerun-wrap" style="margin-top:4px;">
+          <input class="rerun-input" id="ri_${r._idx}" placeholder="enter website…"
             onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}"
             onclick="event.stopPropagation()">
+          <button class="rerun-btn" id="rb_${r._idx}" onclick="event.stopPropagation();triggerRerun(${r._idx})">&#x21BA;</button>
+        </div>` : r.status !== 'Running…' ? `
+        <div class="rerun-wrap" style="margin-top:4px;">
+          <input class="rerun-input" id="ri_${r._idx}" placeholder="enter new website…"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();triggerRerun(${r._idx})}"
+            onclick="event.stopPropagation()" style="width:100px;">
           <button class="rerun-btn" id="rb_${r._idx}" onclick="event.stopPropagation();triggerRerun(${r._idx})">&#x21BA;</button>
         </div>` : `<div style="font-family:var(--mono);font-size:.63rem;color:var(--text3);margin-top:3px;">&#x23F3; running…</div>`}
       </td>
       <td onclick="event.stopPropagation()">
         ${sBadge(r.status)}
-        ${r.status === 'Website not found' ? `
-        <div style="display:flex;flex-direction:column;gap:3px;margin-top:5px;">
-          <a href="https://www.google.com/search?q=${encodeURIComponent(r.company+' official website')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;">&#x1F50D; Find website</a>
+      </td>
+      <td onclick="event.stopPropagation()">
+        ${susLink}
+        ${r.status === 'Sustainability page not found' && r.status !== 'Running…' ? `
+        <div style="margin-top:5px;" onclick="event.stopPropagation()">
+          <a href="${susSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;display:block;margin-bottom:3px;">&#x1F50D; Find sus page</a>
           <div class="rerun-wrap">
-            <input class="rerun-input" id="wsi_${r._idx}" placeholder="paste URL…" style="width:90px;font-size:.6rem;"
-              onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value.trim();if(v){const inp=document.getElementById('ri_${r._idx}');if(inp)inp.value=v;triggerRerun(${r._idx})}}"
-              onclick="event.stopPropagation()">
-            <button class="rerun-btn" onclick="event.stopPropagation();const v=document.getElementById('wsi_${r._idx}').value.trim();if(v){const inp=document.getElementById('ri_${r._idx}');if(inp)inp.value=v;triggerRerun(${r._idx})}">&#x21BA;</button>
-          </div>
-        </div>` : ''}
-        ${r.status === 'Sustainability page not found' ? `
-        <div style="display:flex;flex-direction:column;gap:3px;margin-top:5px;" onclick="event.stopPropagation()">
-          <a href="${susSearchUrl(r.company, r.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="td-link" style="font-size:.62rem;white-space:nowrap;">&#x1F50D; Find sus page</a>
-          <div class="rerun-wrap">
-            <input class="rerun-input" id="sri_${r._idx}" placeholder="paste URL…" style="width:90px;font-size:.6rem;"
+            <input class="rerun-input" id="sri_${r._idx}" placeholder="paste URL…" style="width:100px;font-size:.6rem;"
               onkeydown="if(event.key==='Enter'){event.preventDefault();triggerSusRerun(${r._idx})}"
               onclick="event.stopPropagation()">
             <button class="rerun-btn" id="srb_${r._idx}" onclick="event.stopPropagation();triggerSusRerun(${r._idx})">&#x21BA;</button>
           </div>
         </div>` : ''}
       </td>
-      <td>${susLink}</td>
       <td class="td-mono" onclick="event.stopPropagation()">${nzCell}</td>
       <td>
         ${summaryText ? `<span class="td-summary" title="${safeSummary}">${summaryText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : '<span class="td-na">&#x2014;</span>'}
@@ -3459,16 +3468,40 @@ function renderCards(data) {
 
 // ── Stats ──────────────────────────────────────────────────────────────────────
 function updateStats(data) {
-  const ok   = data.filter(r => r.status==='Success').length;
-  const nz   = data.filter(r => r.net_zero_target_year).length;
-  const sbti = data.filter(r => r.sbti_near_term_status==='Targets set'||r.sbti_net_zero_status==='Targets set').length;
-  const mats = data.map(r => r.maturity_score ?? calcMaturity(r));
-  const avg  = mats.length ? (mats.reduce((a,b)=>a+b,0)/mats.length).toFixed(1) : '&#x2014;';
-  document.getElementById('sTotal').textContent  = data.length;
-  document.getElementById('sOK').textContent     = ok;
-  document.getElementById('sNZ').textContent     = nz;
-  document.getElementById('sSBTi').textContent   = sbti;
-  document.getElementById('sAvgMat').innerHTML   = avg;
+  const total    = data.length;
+  const withWeb  = data.filter(r => r.website).length;
+  const withSus  = data.filter(r => r.sustainability_url).length;
+  const withNZ   = data.filter(r => r.net_zero_target_year).length;
+  const withDoc  = data.filter(r => r.transition_plan_url).length;
+  const withSBTi = data.filter(r => r.sbti_near_term_status==='Targets set'||r.sbti_net_zero_status==='Targets set').length;
+  const withCDP  = data.filter(r => r.cdp_score).length;
+  const verified = data.filter(r => r.verified_by).length;
+  const assessed = data.filter(r => assessmentStarted(r.manual_assessment)).length;
+
+  // AI avg maturity — all companies with data
+  const aiMats  = data.map(r => r.maturity_score ?? calcMaturity(r)).filter(s => s > 0);
+  const aiAvg   = aiMats.length ? (aiMats.reduce((a,b)=>a+b,0)/aiMats.length).toFixed(1) : null;
+
+  // Verified avg — only companies with a completed assessment score
+  const vMats   = data.filter(r => r.manual_maturity_score != null).map(r => r.manual_maturity_score);
+  const vAvg    = vMats.length ? (vMats.reduce((a,b)=>a+b,0)/vMats.length).toFixed(1) : null;
+
+  const set = (id, val, fallback='&#x2014;') => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = val != null ? val : fallback;
+  };
+
+  set('sTotal',      total);
+  set('sWeb',        withWeb);
+  set('sSus',        withSus);
+  set('sNZ',         withNZ);
+  set('sDoc',        withDoc);
+  set('sSBTi',       withSBTi);
+  set('sCDP',        withCDP);
+  set('sAvgMat',     aiAvg);
+  set('sAvgVerified',vAvg);
+  set('sVerified',   verified);
+  set('sAssessed',   assessed);
 }
 
 // ── Detail panel ───────────────────────────────────────────────────────────────
@@ -3756,7 +3789,7 @@ function openPanel(r) {
   })();
 
   document.getElementById('pGrid').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem;">
+    <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem;">
       <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
         <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">AI Maturity Score</div>
         <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
@@ -3767,7 +3800,7 @@ function openPanel(r) {
         ${verifiedScoreDisplay}
       </div>
     </div>
-    ${pf('Status', sBadge(r.status))}
+    ${pf('Status', sBadge(r.status), true)}
     ${pf('AI Maturity Detail', maturityDisplay, true)}
     ${carbonSection}
     ${netZeroSection}
