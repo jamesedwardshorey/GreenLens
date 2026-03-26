@@ -1210,7 +1210,7 @@ function isSusPageUrl(url) {
 // Returns { url, is_valid, summary, net_zero_target_year, net_zero_source, emissions_reduction_target, key_initiatives }
 async function scanAndExtractSusPage(url, companyName) {
   log('b', `  Scanning page: ${url}`);
-  const html = await proxyFetch(url, 15000);
+  const html = await proxyFetch(url, 10000);
   if (!html) {
     log('a', `  Proxy fetch failed for ${url} — cannot verify page, rejecting`);
     return { url, is_valid: false, proxyFailed: true };
@@ -1342,7 +1342,7 @@ async function scanAndExtractSusPage(url, companyName) {
 async function aiFindSusPage(website, companyName) {
   const baseUrl = `https://${website}`;
   log('b', `  AI scanning homepage for sus links...`);
-  const html = await proxyFetch(baseUrl, 12000);
+  const html = await proxyFetch(baseUrl, 8000);
   if (!html) return null;
 
   const links = new Set();
@@ -1539,26 +1539,36 @@ const PROXIES = [
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}&cookie=1`,
   url => `https://thingproxy.freeboard.io/fetch/${url}`,
 ];
-async function proxyFetch(url, timeout=12000, idx=0) {
-  if (idx >= PROXIES.length) return null;
+function fetchWithTimeout(url, opts, ms) {
+  // Manual timeout wrapper — AbortSignal.timeout not reliable in all browsers
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('fetch timeout')), ms);
+    fetch(url, opts).then(r => { clearTimeout(timer); resolve(r); }, e => { clearTimeout(timer); reject(e); });
+  });
+}
+
+async function proxyFetch(url, timeout=10000, idx=0) {
+  if (idx >= 2) return null;
+  // Validate URL before fetching — invalid URLs throw in fetch() and can crash workers
+  try { new URL(url); } catch { return null; }
   try {
-    const r = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(timeout) });
+    const r = await fetchWithTimeout(PROXIES[idx](url), {}, timeout);
     if (r.ok) return await r.text();
   } catch {}
   return proxyFetch(url, timeout, idx+1);
 }
 
-async function quickCheckUrl(url, timeout=7000, skipRedirectCheck=false) {
+async function quickCheckUrl(url, timeout=5000, skipRedirectCheck=false) {
   // Try no-cors HEAD first — fast, works for most sites
   let headOk = false;
   try {
-    await fetch(url, { method:'HEAD', mode:'no-cors', signal: AbortSignal.timeout(timeout) });
+    await fetchWithTimeout(url, { method:'HEAD', mode:'no-cors' }, timeout);
     headOk = true;
   } catch {}
   // Some servers reject HEAD — try a no-cors GET as fallback
   if (!headOk) {
     try {
-      await fetch(url, { method:'GET', mode:'no-cors', signal: AbortSignal.timeout(timeout) });
+      await fetchWithTimeout(url, { method:'GET', mode:'no-cors' }, timeout);
       headOk = true;
     } catch {}
   }
@@ -1573,7 +1583,7 @@ async function quickCheckUrl(url, timeout=7000, skipRedirectCheck=false) {
 // Fetch via proxy and check the page wasn't silently redirected to a homepage
 async function verifySusPageNotRedirected(url, timeout=8000) {
   try {
-    const r = await fetch(PROXIES[0](url), { signal: AbortSignal.timeout(timeout) });
+    const r = await fetchWithTimeout(PROXIES[0](url), {}, timeout);
     if (!r.ok) return false;
     // Some proxies expose the final URL after redirects
     const finalUrl = r.url || url;
@@ -1603,6 +1613,14 @@ async function verifySusPageNotRedirected(url, timeout=8000) {
 
 // ── DDG search ─────────────────────────────────────────────────────────────
 const SITE_BLOCK = /linkedin|facebook|twitter|x\.com|youtube|instagram|tiktok|companies\.gov|find-and-update\.company|endole|dnb\.com|zoominfo|glassdoor|indeed|totaljobs|reed\.co|trustpilot|yelp|wikipedia|bloomberg|crunchbase|pitchbook|reuters|guardian|telegraph|bbc\.|ft\.com|theguardian|dailymail|forbes|businessinsider|duedil|opencorporates|bizdb|companycheck|cylex|yell\.com|companiesintheuk|charities\.gov/i;
+
+// Additional filter: reject bare protocol strings and clearly invalid hostnames
+function isValidHostname(hostname) {
+  if (!hostname || hostname === 'https' || hostname === 'http') return false;
+  if (!hostname.includes('.')) return false;
+  if (hostname.includes(' ') || hostname.includes('(') || hostname.includes(')')) return false;
+  return true;
+}
 
 function extractUrlsFromHtml(html, targetDomain) {
   const urls = [];
@@ -1755,7 +1773,13 @@ function domainWords(name) {
 }
 function getTradingName(name) {
   const m = name.match(/^(.+?)\s*(?:t\/a|trading as|also known as|dba)\s*(.+)$/i);
-  return m ? m[2].trim() : null;
+  if (!m) return null;
+  const trading = m[2].trim();
+  // Reject if trading name looks like a second company name (contains LTD, PLC, etc.)
+  // or if it contains unmatched parentheses — indicates a malformed entry
+  if (/\b(limited|ltd\.?|plc|llp|llc|inc\.?|corp\.?)\b/i.test(trading)) return null;
+  if ((trading.match(/\(/g)||[]).length !== (trading.match(/\)/g)||[]).length) return null;
+  return trading;
 }
 
 // ── Website search ──────────────────────────────────────────────────────────
@@ -1832,6 +1856,7 @@ async function findWebsite(companyName) {
     for (const u of urls) {
       let hostname;
       try { hostname = new URL(u).hostname.toLowerCase(); } catch { continue; }
+      if (!isValidHostname(hostname)) continue;
       if (SITE_BLOCK.test(hostname)) continue;
       // Block login/webmail/app/portal subdomains — these are never the company's main website
       if (/^(login|webmail|mail|app|portal|secure|auth|sso|accounts?|my|web)\./i.test(hostname.replace('www.',''))) continue;
@@ -2095,6 +2120,7 @@ async function crawlSusPageForDocs(baseUrl, domain) {
   }
 
   // Scan homepage and common sus paths
+  // Only probe paths if the site is reachable — skip if proxy consistently fails
   const paths = ['', '/sustainability', '/esg', '/environment', '/about/sustainability', '/csr', '/corporate-responsibility'];
   for (const p of paths.slice(0, 3)) { // limit to first 3 to avoid too many requests
     try { await scanPageForDocs(baseUrl.replace(/\/$/, '') + p); } catch {}
@@ -2274,6 +2300,11 @@ async function processOne(row) {
 
   const cached = dbGet(company);
   let website = (row['Website']||row['website']||cached?.website||'').replace(/^https?:\/\//,'').replace(/\/$/,'').trim();
+  // Reject obviously invalid website values — spaces, parentheses, no dot
+  if (website && (website.includes(' ') || website.includes('(') || !website.includes('.'))) {
+    log('a', `  Invalid website value "${website}" — ignoring`);
+    website = '';
+  }
 
   const base = { company, website, extraction_date: new Date().toISOString().slice(0,10) };
 
@@ -2919,7 +2950,11 @@ async function startRun() {
       r.status = 'Running\u2026';
       applyFilters();
       try {
-        const result = await processOne({ 'Company Name': r.company, Website: r.website||'' });
+        // Per-company timeout — prevents a single hung request from stalling a worker
+        const result = await Promise.race([
+          processOne({ 'Company Name': r.company, Website: r.website||'' }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out after 60s')), 60000))
+        ]);
         if (result) {
           result._idx = r._idx;
           Object.assign(r, result);
@@ -2928,7 +2963,7 @@ async function startRun() {
           addAuditEntry(r._wasRerun ? 'analysis_rerun' : 'analysis_run', r.company, { status: r.status, website: r.website || null });
         }
       } catch(e) {
-        r.status = 'Website not found';
+        r.status = 'Error';
         log('r', `Error ${r.company}: ${e.message}`);
       }
       done++;
