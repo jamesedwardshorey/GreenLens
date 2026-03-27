@@ -24,7 +24,10 @@ a{color:inherit;}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--green);background:rgba(74,222,128,.03);}
 .upload-zone h2{font-size:1rem;color:var(--text2);font-weight:500;margin-bottom:.4rem;}
 .upload-zone p{font-size:.75rem;color:var(--text3);}
-.stats-bar{display:flex;gap:1rem;padding:.55rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border1);flex-wrap:wrap;}
+.stats-bar{display:flex;gap:1rem;padding:.55rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border1);flex-wrap:wrap;position:relative;z-index:101;}
+.panel-open .stats-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+.panel-open .stats-bar::-webkit-scrollbar{display:none;}
+.panel-open .stats-bar .stat-sep,.panel-open .stats-bar .stat,.panel-open .stats-bar button{flex-shrink:0;}
 .stat{display:flex;flex-direction:column;align-items:center;gap:1px;}
 .stat-sep{width:1px;background:var(--border2);align-self:stretch;margin:0 .15rem;}
 .stat-n{font-family:var(--mono);font-size:1.05rem;font-weight:700;}
@@ -33,7 +36,10 @@ a{color:inherit;}
 .prog-title{font-size:.72rem;color:var(--text2);margin-bottom:.3rem;display:flex;justify-content:space-between;}
 .prog-bar-bg{background:var(--bg4);border-radius:99px;height:5px;overflow:hidden;}
 .prog-bar-fill{background:linear-gradient(90deg,var(--green),var(--lime));height:100%;transition:width .3s;border-radius:99px;width:0%;}
-.toolbar{padding:.5rem 1.2rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border1);}
+.toolbar{padding:.5rem 1.2rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border1);position:relative;z-index:101;}
+.panel-open .toolbar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+.panel-open .toolbar::-webkit-scrollbar{display:none;}
+.panel-open .toolbar>*{flex-shrink:0;}
 .btn{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:.75rem;padding:5px 12px;cursor:pointer;transition:.15s;font-family:var(--sans);}
 .btn:hover{background:var(--bg4);color:var(--text1);}
 .btn.primary{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.25);color:var(--green);}
@@ -80,11 +86,20 @@ tr:hover td{background:rgba(255,255,255,.015);}
 .sort-arrow.asc::after{content:'\25B2';}
 .sort-arrow.desc::after{content:'\25BC';}
 .sort-arrow.asc,.sort-arrow.desc{opacity:1;}
-.overlay{position:fixed;inset:0;z-index:100;display:flex;pointer-events:none;opacity:0;transition:opacity .2s;}
-.overlay.open{pointer-events:all;opacity:1;}
-.overlay-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);}
-.panel{position:absolute;right:0;top:0;bottom:0;width:min(540px,96vw);background:var(--bg2);border-left:1px solid var(--border2);overflow-y:auto;padding:1.5rem;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
-.overlay.open .panel{transform:translateX(0);}
+.overlay{position:fixed;top:0;right:0;bottom:0;z-index:100;pointer-events:none;width:min(960px,72vw);transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.overlay.open{pointer-events:all;transform:translateX(0);}
+.overlay-bg{display:none;}
+.panel{position:absolute;inset:0;background:var(--bg2);border-left:1px solid var(--border2);display:flex;flex-direction:column;overflow:hidden;}
+.panel-topbar{flex-shrink:0;padding:.85rem 1.25rem;border-bottom:1px solid var(--border2);}
+.panel-cols{display:grid;grid-template-columns:5fr 8fr;flex:1;overflow:hidden;min-height:0;}
+.panel-col{overflow-y:auto;padding:1rem 1.25rem;}
+.panel-col-left{border-right:1px solid var(--border2);}
+/* Main content shrinks left when panel opens */
+.main-wrap{transition:margin-right .25s cubic-bezier(.4,0,.2,1);margin-right:0;}
+.panel-open .main-wrap{margin-right:min(960px,72vw);}
+.panel-open .stats-bar,.panel-open .toolbar,.panel-open .prog-wrap,.panel-open .log-wrap,.panel-open .cfg{margin-right:min(960px,72vw);transition:margin-right .25s cubic-bezier(.4,0,.2,1);}
+/* Highlight selected row */
+tr.panel-selected td{background:rgba(56,189,248,.07) !important;}
 .pf{padding:.55rem 0;border-bottom:1px solid var(--border1);}
 .pf.full{grid-column:1/-1;}
 .pf-label{font-size:.61rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;}
@@ -165,6 +180,7 @@ tr:hover td{background:rgba(255,255,255,.015);}
   <label>Delay (s)</label>
   <select id="delay"><option value="0.5">0.5</option><option value="1" selected>1</option><option value="1.5">1.5</option><option value="2">2</option></select>
 </div>
+<div class="main-wrap" id="mainWrap">
 <div id="uploadSection" style="border-bottom:1px solid var(--border2);background:var(--bg2);">
   <!-- Collapsible header — always visible -->
   <div id="uploadHeader" onclick="toggleUploadSection()"
@@ -294,6 +310,7 @@ tr:hover td{background:rgba(255,255,255,.015);}
       <th onclick="colSortBy('verified')" class="th-sort" style="width:52px;text-align:center;" title="Verification">&#x2714; <span class="sort-arrow" id="sa-verified"></span></th>
       <th onclick="colSortBy('name')" class="th-sort" style="min-width:160px;">Company <span class="sort-arrow" id="sa-name"></span></th>
       <th onclick="colSortBy('suspage')" class="th-sort" style="min-width:180px;">Sustainability Page <span class="sort-arrow" id="sa-suspage"></span></th>
+      <th onclick="colSortBy('maturity')" class="th-sort" style="min-width:140px;">Maturity Scores <span class="sort-arrow" id="sa-maturity"></span></th>
       <th onclick="colSortBy('carbon')" class="th-sort" style="min-width:160px;">Carbon Data <span class="sort-arrow" id="sa-carbon"></span></th>
       <th onclick="colSortBy('nz')" class="th-sort" style="min-width:160px;">Net Zero <span class="sort-arrow" id="sa-nz"></span></th>
       <th onclick="colSortBy('doc')" class="th-sort" style="min-width:150px;">Document <span class="sort-arrow" id="sa-doc"></span></th>
@@ -301,7 +318,6 @@ tr:hover td{background:rgba(255,255,255,.015);}
       <th onclick="colSortBy('progress')" class="th-sort" style="min-width:150px;">Progress <span class="sort-arrow" id="sa-progress"></span></th>
       <th onclick="colSortBy('date')" class="th-sort" style="min-width:80px;">Last Run <span class="sort-arrow" id="sa-date"></span></th>
       <th onclick="colSortBy('confidence')" class="th-sort" style="min-width:90px;">Confidence <span class="sort-arrow" id="sa-confidence"></span></th>
-      <th onclick="colSortBy('maturity')" class="th-sort" style="min-width:140px;">Maturity Scores <span class="sort-arrow" id="sa-maturity"></span></th>
     </tr></thead>
     <tbody id="tBody"></tbody>
   </table>
@@ -331,28 +347,47 @@ tr:hover td{background:rgba(255,255,255,.015);}
     <button class="btn" onclick="loadAuditLog(true)" style="font-size:.75rem;">Load more</button>
   </div>
 </div>
+</div><!-- /main-wrap -->
 <div class="overlay" id="overlay">
-  <div class="overlay-bg" onclick="closePanel()"></div>
+  <div class="overlay-bg"></div>
   <div class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem;">
-      <div>
-        <div style="font-size:1.05rem;font-weight:700;color:var(--text1);" id="pName"></div>
-        <div id="pWebsite" style="font-size:.78rem;margin-top:.35rem;"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:.5rem;">
+    <!-- Top bar: nav + company name + website -->
+    <div class="panel-topbar">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.6rem;">
+        <button onclick="panelNav(-1)" title="Previous (←)" id="btnPanelPrev"
+          style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;cursor:pointer;color:var(--text2);font-size:.8rem;padding:4px 10px;line-height:1;"
+          onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">&#x2190;</button>
+        <span id="pNavPos" style="font-size:.7rem;color:var(--text3);flex:1;text-align:center;"></span>
+        <button onclick="panelNav(1)" title="Next (→)" id="btnPanelNext"
+          style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;cursor:pointer;color:var(--text2);font-size:.8rem;padding:4px 10px;line-height:1;"
+          onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'">&#x2192;</button>
+        <div style="width:1px;background:var(--border2);align-self:stretch;margin:0 .2rem;"></div>
         <button id="btnRemoveCompany" title="Remove from project"
           style="background:none;border:1px solid rgba(248,113,113,.25);border-radius:5px;cursor:pointer;color:var(--text3);font-size:.68rem;padding:3px 8px;"
           onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'"
           onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.25)'">&#x2715; Remove</button>
-        <button onclick="closePanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;line-height:1;padding:.2rem;">&#x2715;</button>
+        <button onclick="closePanel()" title="Close" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.1rem;line-height:1;padding:2px 4px;">&#x2715;</button>
+      </div>
+      <div style="font-size:1rem;font-weight:700;color:var(--text1);" id="pName"></div>
+      <div id="pWebsite" style="font-size:.75rem;margin-top:.2rem;"></div>
+    </div>
+    <!-- Two-column body -->
+    <div class="panel-cols">
+      <!-- LEFT: Your Review (verification + assessment) -->
+      <div class="panel-col panel-col-left" id="pColLeft">
+        <!-- Review form injected here by openPanel -->
+        <div id="pReviewSection"></div>
+      </div>
+      <!-- RIGHT: AI data -->
+      <div class="panel-col" id="pColRight">
+        <!-- Score cards at top of right column -->
+        <div id="pScoreCards" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.85rem;"></div>
+        <div class="pf-label" style="margin-bottom:.3rem;">Sustainability Page</div>
+        <div id="pUrl" style="font-size:.8rem;margin-bottom:.6rem;word-break:break-all;"></div>
+        <div id="pRerun" style="margin-bottom:.75rem;display:none;"></div>
+        <div id="pGrid"></div>
       </div>
     </div>
-    <div class="pf-label">Sustainability Page</div>
-    <div id="pUrl" style="font-size:.82rem;margin-bottom:.6rem;word-break:break-all;"></div>
-    <div id="pRerun" style="margin-bottom:1rem;display:none;"></div>
-    <!-- Score cards — always full width, outside the 2-col grid -->
-    <div id="pScoreCards" style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1rem;"></div>
-    <div id="pGrid"></div>
   </div>
 </div>
 </div>
@@ -3430,6 +3465,20 @@ function renderTable(data) {
         </div>` : ''}
       </td>
 
+      <!-- Maturity scores -->
+      <td>
+        <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">AI</div>
+        <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
+        <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span>
+        ${r.manual_maturity_score != null ? `
+        <div style="margin-top:5px;padding-top:5px;border-top:1px solid var(--border1);">
+          <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Verified</div>
+          <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--sky);">${r.manual_maturity_score}/20</span>
+          <span style="font-size:.6rem;color:var(--text3);margin-left:3px;">${assessmentProgress(r.manual_assessment)}/8</span>
+          ${r.assessment_verified_by ? `<div style="font-size:.6rem;color:var(--green);margin-top:1px;">✓ ${getInitials(r.assessment_verified_by)}</div>` : ''}
+        </div>` : ''}
+      </td>
+
       <!-- Carbon data -->
       <td>
         ${r.carbon_data ? `<div style="font-size:.72rem;color:var(--text2);line-height:1.4;">${r.carbon_data.replace(/</g,'&lt;')}</div>` : '<span class="td-na">&#x2014;</span>'}
@@ -3470,19 +3519,6 @@ function renderTable(data) {
       <!-- Confidence -->
       <td style="min-width:120px;">${confidenceCell(r)}</td>
 
-      <!-- Maturity scores -->
-      <td>
-        <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">AI</div>
-        <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:${mColor}">${score}/20</span>
-        <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:3px;font-size:.58rem;">${mLabel}</span>
-        ${r.manual_maturity_score != null ? `
-        <div style="margin-top:5px;padding-top:5px;border-top:1px solid var(--border1);">
-          <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Verified</div>
-          <span style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--sky);">${r.manual_maturity_score}/20</span>
-          <span style="font-size:.6rem;color:var(--text3);margin-left:3px;">${assessmentProgress(r.manual_assessment)}/8</span>
-          ${r.assessment_verified_by ? `<div style="font-size:.6rem;color:var(--green);margin-top:1px;">✓ ${getInitials(r.assessment_verified_by)}</div>` : ''}
-        </div>` : ''}
-      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -3836,43 +3872,9 @@ function openPanel(r) {
             ${verifiedBadge}`;
   })();
 
-  // ── Score cards — injected above pGrid into their own container ─────────────
-  document.getElementById('pScoreCards').innerHTML = `
-    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
-      <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">AI Maturity Score</div>
-      <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
-      <div><span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);font-size:.58rem;margin-top:4px;">${mLabel}</span></div>
-    </div>
-    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
-      <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">Verified Maturity Score</div>
-      ${verifiedScoreDisplay}
-    </div>`;
-
-  document.getElementById('pGrid').innerHTML = `
-    ${pf('Status', sBadge(r.status), true)}
-    ${pf('AI Maturity Detail', maturityDisplay, true)}
-    ${carbonSection}
-    ${netZeroSection}
-    ${certSection}
-    ${initiativesSection}
-    ${pf('Last Run', r.extraction_date)}
-    ${pf('Confidence', (() => {
-  const map = { High:'b-ok', Medium:'b-warn', Low:'b-err' };
-  const reasons = r.confidence_reasons || [];
-  const badge = '<span class="badge ' + (map[r.confidence]||'b-dim') + '">' + (r.confidence||'—') + '</span>';
-  if (!reasons.length) return badge;
-  const list = reasons.map(rr => {
-    const isPos = rr.startsWith('✓');
-    const col = isPos ? 'var(--green)' : 'var(--amber,#f59e0b)';
-    return '<div style="font-size:.72rem;color:' + col + ';margin-top:2px;">' + rr + '</div>';
-  }).join('');
-  return badge + '<div style="margin-top:6px;">' + list + '</div>';
-})())}
-  `;
-
-  // ── User review section ───────────────────────────────────────────────────
+  // ── User review section — built first, prepended to top of pGrid ─────────────
   const reviewSection = document.createElement('div');
-  reviewSection.style.cssText = 'margin-top:1rem;border-top:1px solid var(--border2);padding-top:1rem;';
+  reviewSection.style.cssText = 'width:100%;';
   reviewSection.innerHTML = `
     <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.75rem;">&#x270F;&#xFE0F; Your Review</div>
     <div style="margin-bottom:.85rem;">
@@ -3887,15 +3889,15 @@ function openPanel(r) {
         : `<button class="btn primary" onclick="toggleVerified(${r._idx})" style="width:100%;justify-content:center;font-size:.8rem;">✓ Mark as verified</button>`}
     </div>
     <div style="font-size:.75rem;color:var(--text2);margin-bottom:.35rem;">Notes</div>
-    <textarea id="notesInput_${r._idx}" rows="3" placeholder="Add notes about this company…"
+    <textarea id="notesInput_${r._idx}" rows="2" placeholder="Add notes about this company…"
       style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);font-size:.78rem;padding:.5rem .7rem;outline:none;resize:vertical;box-sizing:border-box;line-height:1.4;"
       onfocus="this.style.borderColor='var(--sky)'" onblur="this.style.borderColor='var(--border2)'"
     >${r.user_notes ? r.user_notes.replace(/</g,'&lt;') : ''}</textarea>
-    <div style="display:flex;justify-content:flex-end;margin-top:.4rem;">
+    <div style="display:flex;justify-content:flex-end;margin-top:.4rem;margin-bottom:.85rem;">
       <button id="notesSaveBtn_${r._idx}" class="btn primary" onclick="saveNotes(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save notes</button>
     </div>
 
-    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border1);">
+    <div style="border-top:1px solid var(--border1);padding-top:.85rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
         <div>
           <div style="font-size:.75rem;font-weight:600;color:var(--text1);">Verified Maturity Assessment</div>
@@ -3926,7 +3928,44 @@ function openPanel(r) {
         <button id="assessmentSaveBtn_${r._idx}" class="btn primary" onclick="saveAssessment(${r._idx})" style="font-size:.72rem;padding:5px 14px;">Save assessment</button>
       </div>
     </div>`;
-  document.getElementById('pGrid').appendChild(reviewSection);
+
+  // ── Score cards ───────────────────────────────────────────────────────────────
+  document.getElementById('pScoreCards').innerHTML = `
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">AI Maturity Score</div>
+      <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
+      <div><span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);font-size:.58rem;margin-top:4px;">${mLabel}</span></div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.4rem;">Verified Maturity Score</div>
+      ${verifiedScoreDisplay}
+    </div>`;
+
+  // ── AI data grid — review section prepended so it appears first ───────────────
+  document.getElementById('pGrid').innerHTML = `
+    ${pf('Status', sBadge(r.status), true)}
+    ${pf('AI Maturity Detail', maturityDisplay, true)}
+    ${carbonSection}
+    ${netZeroSection}
+    ${certSection}
+    ${initiativesSection}
+    ${pf('Last Run', r.extraction_date)}
+    ${pf('Confidence', (() => {
+  const map = { High:'b-ok', Medium:'b-warn', Low:'b-err' };
+  const reasons = r.confidence_reasons || [];
+  const badge = '<span class="badge ' + (map[r.confidence]||'b-dim') + '">' + (r.confidence||'—') + '</span>';
+  if (!reasons.length) return badge;
+  const list = reasons.map(rr => {
+    const isPos = rr.startsWith('✓');
+    const col = isPos ? 'var(--green)' : 'var(--amber,#f59e0b)';
+    return '<div style="font-size:.72rem;color:' + col + ';margin-top:2px;">' + rr + '</div>';
+  }).join('');
+  return badge + '<div style="margin-top:6px;">' + list + '</div>';
+})())}
+  `;
+  // Inject review into left column container
+  const reviewContainer = document.getElementById('pReviewSection');
+  if (reviewContainer) reviewContainer.replaceChildren(reviewSection);
 
   // Company audit history (async — appended after render)
   (async () => {
@@ -3963,15 +4002,64 @@ function openPanel(r) {
         <div style="font-size:.75rem;color:var(--sky);font-weight:600;">Data from: ${r.source_project_name}</div>
         <div style="font-size:.68rem;color:var(--text3);margin-top:1px;">Originally analysed ${r.extraction_date ? new Date(r.extraction_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'unknown date'} · <a href="#" onclick="event.preventDefault();rerunFromPanel(${r._idx})" style="color:var(--sky);text-decoration:none;">Re-run fresh analysis</a></div>
       </div>`;
-    document.getElementById('pGrid').prepend(srcDiv);
+    document.getElementById('pGrid').appendChild(srcDiv);
   }
 
+  // Scroll both columns back to top
+  const colL = document.getElementById('pColLeft');
+  const colR = document.getElementById('pColRight');
+  if (colL) colL.scrollTop = 0;
+  if (colR) colR.scrollTop = 0;
   document.getElementById('overlay').classList.add('open');
+  document.body.classList.add('panel-open');
+  // Update nav position indicator
+  _updatePanelNav(r);
+  // Highlight selected row
+  document.querySelectorAll('tr.panel-selected').forEach(el => el.classList.remove('panel-selected'));
+  const rows = document.querySelectorAll('#tBody tr');
+  rows.forEach(row => {
+    if (row.querySelector('.td-co')?.title === r.company) row.classList.add('panel-selected');
+  });
 }
 
 function closePanel() {
   document.getElementById('overlay').classList.remove('open');
+  document.body.classList.remove('panel-open');
+  document.querySelectorAll('tr.panel-selected').forEach(el => el.classList.remove('panel-selected'));
+  _panelIdx = null;
 }
+
+let _panelIdx = null; // index into filteredResults
+
+function _updatePanelNav(r) {
+  const idx = filteredResults.findIndex(x => x._idx === r._idx);
+  _panelIdx = idx;
+  const total = filteredResults.length;
+  const pos = document.getElementById('pNavPos');
+  if (pos) pos.textContent = idx >= 0 ? `${idx + 1} / ${total}` : '';
+  const prev = document.getElementById('btnPanelPrev');
+  const next = document.getElementById('btnPanelNext');
+  if (prev) prev.style.opacity = idx > 0 ? '1' : '.3';
+  if (next) next.style.opacity = idx < total - 1 ? '1' : '.3';
+}
+
+function panelNav(dir) {
+  if (_panelIdx === null) return;
+  const newIdx = _panelIdx + dir;
+  if (newIdx < 0 || newIdx >= filteredResults.length) return;
+  const r = filteredResults[newIdx];
+  if (r) openPanel(r);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('overlay').classList.contains('open')) return;
+  // Don't intercept when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); panelNav(-1); }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  { e.preventDefault(); panelNav(1); }
+  if (e.key === 'Escape') closePanel();
+});
 
 function toggleVerified(idx) {
   const r = _rByIdx[idx];
