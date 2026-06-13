@@ -1082,9 +1082,12 @@ async function runMasterSearch() {
       <button class="btn primary" style="font-size:.6rem;padding:2px 8px;" onclick="switchToProject('${group.id}','${pName.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">Open project →</button>
     </div>`;
     group.rows.forEach(r => {
-      const score = r.manual_maturity_score != null ? r.manual_maturity_score : r.maturity_score;
-      const scoreHtml = score != null
-        ? `<span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${score>=14?'var(--green)':score>=8?'var(--amber)':'var(--text3)'};">${score}/20</span>`
+      const manScore = r.manual_maturity_score;
+      const aiScore  = r.maturity_score;
+      const scoreHtml = manScore != null
+        ? `<span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--sky);" title="Verified score">${manScore}</span>`
+        : aiScore != null
+        ? `<span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${aiScore>=12?'var(--green)':aiScore>=6?'var(--amber)':'var(--text3)'};" title="AI estimated range">${maturityRange(aiScore)}</span>`
         : '<span style="font-size:.7rem;color:var(--text3);">—</span>';
       const susHtml = r.sustainability_url
         ? `<span style="font-size:.65rem;color:var(--green);">✓ Sus page</span>`
@@ -1463,12 +1466,12 @@ const SIC_LABELS = {
 };
 
 function scoreDelta(current, expected) {
-  // Returns a display object for the gap between current and expected score
   if (current == null || expected == null) return null;
-  const diff = current - expected;
-  if (diff >= 2)  return { diff, label: `↑ +${diff}`, color: 'var(--green)',  bg: 'rgba(74,222,128,.12)',  border: 'rgba(74,222,128,.3)',  text: 'Overperforming' };
-  if (diff >= -1) return { diff, label: diff === 0 ? '≈ On track' : `≈ ${diff > 0 ? '+' : ''}${diff}`, color: 'var(--text2)', bg: 'rgba(255,255,255,.05)', border: 'var(--border2)', text: 'On track' };
-  return         { diff, label: `↓ ${diff}`, color: 'var(--amber)', bg: 'rgba(251,191,36,.1)',  border: 'rgba(251,191,36,.3)', text: 'Underperforming' };
+  const tier = s => s >= 12 ? 3 : s >= 6 ? 2 : s >= 1 ? 1 : 0;
+  const diff = tier(current) - tier(expected);
+  if (diff > 0) return { diff, label: '↑ Above',    color: 'var(--green)',  bg: 'rgba(74,222,128,.12)',  border: 'rgba(74,222,128,.3)',  text: 'Above expected' };
+  if (diff === 0) return { diff, label: '≈ On track', color: 'var(--text2)', bg: 'rgba(255,255,255,.05)', border: 'var(--border2)',        text: 'On track' };
+  return           { diff, label: '↓ Below',    color: 'var(--amber)',  bg: 'rgba(251,191,36,.1)',   border: 'rgba(251,191,36,.3)',  text: 'Below expected' };
 }
 
 function deltaBadge(current, expected, small=false) {
@@ -1482,10 +1485,10 @@ function chExpectedScore(accountsType) {
   if (!accountsType) return null;
   const t = accountsType.toLowerCase();
   // Total exemption full = very small SME — check before generic 'full' match
-  if (/total.exemption/.test(t)) return { score: 4, label: '4+', band: 'Total Exemption', color: 'var(--text3)' };
-  if (/full|group|audited/.test(t)) return { score: 12, label: '12+', band: 'Full/Group', color: 'var(--green)' };
-  if (/small|abbreviated|unaudited/.test(t)) return { score: 8, label: '8+', band: 'Small', color: 'var(--amber)' };
-  if (/micro|exemption|dormant|initial/.test(t)) return { score: 4, label: '4+', band: 'Micro/Exempt', color: 'var(--text3)' };
+  if (/total.exemption/.test(t)) return { score: 1,  label: '1–5',  band: 'Total Exemption', color: 'var(--text3)' };
+  if (/full|group|audited/.test(t)) return { score: 12, label: '12+', band: 'Full/Group',      color: 'var(--green)' };
+  if (/small|abbreviated|unaudited/.test(t)) return { score: 6,  label: '6–11', band: 'Small', color: 'var(--amber)' };
+  if (/micro|exemption|dormant|initial/.test(t)) return { score: 1,  label: '1–5',  band: 'Micro/Exempt', color: 'var(--text3)' };
   return null;
 }
 
@@ -3478,7 +3481,6 @@ function scoreDocumentRelevance(url, title) {
   return null; // no relevance signal — skip
 }
 
-// Keep for backward-compat with calcMaturity (high-confidence docs only count for plan bonus)
 function isValidTransitionPlan(url, title) {
   return scoreDocumentRelevance(url, title) === 'high';
 }
@@ -4258,48 +4260,33 @@ function calcDataConfidence(opts) {
 
 // ── Maturity scoring ─────────────────────────────────────────────────────────
 function calcMaturity(r) {
-  // ── Tiered base score ───────────────────────────────────────────────────────
-  // Each tier is a prerequisite of the next. The base is determined by the
-  // highest tier achieved, then bonus points are added on top up to 20.
-  const hasNZ   = !!r.net_zero_target_year;
-  const hasPlan = !!r.transition_plan_url;
-  // Carbon data tier requires explicit reported emissions figures (Scope 1/2/3 tCO2e)
-  // emissions_reduction_target alone (e.g. "cut 46% by 2030") does NOT qualify
-  const hasCarbonData = !!(r.carbon_data && r.carbon_data.trim().length > 0);
-  const hasSusPage = !!r.sustainability_url;
-
-  let base = 0;
-  if (!hasSusPage) {
-    base = 0;                          // No sustainability page
-  } else if (hasNZ) {
-    base = 12;                         // Net zero target
-  } else if (hasCarbonData) {
-    base = 4;                          // Carbon data only
-  } else {
-    base = 1;                          // Sustainability page only
-  }
-
-  // ── Bonus points ──────────────────────────────────────────────────────────
-  let bonus = 0;
-  // Document bonus: high=2pts, medium=1pt, low=0pts
-  const docConf = r.doc_confidence;
-  if (hasPlan && docConf === 'high')   bonus += 2;
-  else if (hasPlan && docConf === 'medium') bonus += 1;
-  if (r.sbti_near_term_status === 'Targets set') bonus += 2;
-  if (r.sbti_net_zero_status  === 'Targets set') bonus += 1;
-  if (r.cdp_score)             bonus += 1;
-  if (r.sme_hub_member)        bonus += 1;
-  if (r.certifications)        bonus += 1;
-
-  return Math.min(base + bonus, 16);  // max reachable is 16, displayed out of 20
+  if (!r.sustainability_url) return 0;
+  // Tier 12+: CDP score, SBTi targets confirmed, or net zero target found
+  if (r.cdp_score) return 12;
+  if (r.sbti_near_term_status === 'Targets set' || r.sbti_net_zero_status === 'Targets set') return 12;
+  if (r.net_zero_target_year) return 12;
+  // Tier 6-11: any carbon/emissions/target language found on the sustainability page
+  if (r.carbon_data && r.carbon_data.trim()) return 6;
+  if (r.emissions_reduction_target && r.emissions_reduction_target.trim()) return 6;
+  const summary = (r.sustainability_summary || r.key_initiatives || '').toLowerCase();
+  if (/carbon|emission|ghg|scope [123]|footprint|tco2|climate target|reduction target|net.?zero/.test(summary)) return 6;
+  // Tier 1-5: sustainability page exists but no carbon language found
+  return 1;
 }
 
 function maturityLabel(score) {
-  if (score >= 14) return { label:'Leading',    color:'var(--green)' };
-  if (score >=  9) return { label:'Advanced',   color:'var(--lime)' };
-  if (score >=  4) return { label:'Developing', color:'var(--amber)' };
-  if (score >=  1) return { label:'Early Stage',color:'var(--amber)' };
-  return { label:'No Data', color:'var(--text3)' };
+  if (score >= 12) return { label: 'Advanced',   color: 'var(--green)' };
+  if (score >=  6) return { label: 'Developing',  color: 'var(--amber)' };
+  if (score >=  1) return { label: 'Early Stage', color: 'var(--text3)' };
+  return                   { label: 'No Data',    color: 'var(--text3)' };
+}
+
+function maturityRange(score) {
+  if (score == null) return '—';
+  if (score >= 12) return '12+';
+  if (score >= 6)  return '6–11';
+  if (score >= 1)  return '1–5';
+  return '0';
 }
 
 function maturityNarrative(r, score, label, hasValidPlan, sbtiVerified, nzAchieved, carbonNeutral) {
@@ -5594,8 +5581,8 @@ function renderTable(data) {
 
       <!-- Current Maturity -->
       <td>
-        <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">AI</div>
-        <span style="font-family:var(--mono);font-size:.78rem;font-weight:600;color:${mColor}">${score}/20</span>
+        <div style="font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">AI (est.)</div>
+        <span style="font-family:var(--mono);font-size:.78rem;font-weight:600;color:${mColor}">${maturityRange(score)}</span>
         <span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);margin-left:2px;font-size:.56rem;">${mLabel}</span>
         ${r.manual_maturity_score != null ? `
         <div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border1);">
@@ -5694,7 +5681,7 @@ function renderCards(data) {
       ${r.website ? `<div style="font-family:var(--mono);font-size:.65rem;color:var(--text3);margin-bottom:.3rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.website}</div>` : ''}
       <div class="card-mat">
         <div class="card-mat-l">Maturity</div>
-        <div class="card-mat-v" style="color:${mColor}">${score}/20 <span style="font-size:.65rem;opacity:.8;">${mLabel}</span></div>
+        <div class="card-mat-v" style="color:${mColor}">${maturityRange(score)} <span style="font-size:.65rem;opacity:.8;">${mLabel}</span></div>
       </div>`;
     grid.appendChild(c);
   });
@@ -5877,72 +5864,55 @@ function openPanel(r) {
 
   const maturityDisplay = (() => {
     const hasNZ      = !!r.net_zero_target_year;
-    const hasPlan    = !!r.transition_plan_url;
-    const hasCO2     = !!(r.carbon_data && r.carbon_data.trim().length > 0);
+    const hasCDP     = !!r.cdp_score;
+    const hasSBTi    = r.sbti_near_term_status === 'Targets set' || r.sbti_net_zero_status === 'Targets set';
     const hasSusPage = !!r.sustainability_url;
+    const summary    = (r.sustainability_summary || r.key_initiatives || '').toLowerCase();
+    const hasCarbonLang = !!(r.carbon_data && r.carbon_data.trim())
+      || !!(r.emissions_reduction_target && r.emissions_reduction_target.trim())
+      || /carbon|emission|ghg|scope [123]|footprint|tco2|climate target|reduction target|net.?zero/.test(summary);
+    const tier3 = hasSusPage && (hasNZ || hasCDP || hasSBTi);
+    const tier2 = hasSusPage && (hasCarbonLang || tier3);
+    const tier1 = hasSusPage;
 
-    // Determine which base tier was reached
-    let baseTier = 0;
-    if (!hasSusPage)   baseTier = 0;
-    else if (hasNZ)    baseTier = 3;
-    else if (hasCO2)   baseTier = 2;
-    else               baseTier = 1;
+    const tier2Detail = tier3
+      ? (hasNZ ? `Net zero target: ${r.net_zero_target_year}` : hasCDP ? `CDP score: ${r.cdp_score}` : 'SBTi targets confirmed')
+      : r.carbon_data || r.emissions_reduction_target || 'Carbon/emissions terms found in page text';
+    const tier3Detail = hasNZ ? `Target year: ${r.net_zero_target_year}`
+      : hasCDP ? `CDP score: ${r.cdp_score}`
+      : hasSBTi ? (r.sbti_net_zero_status || r.sbti_near_term_status || 'SBTi targets confirmed')
+      : 'Not found';
 
     const tiers = [
-      { label: 'Sustainability page', base: 1,  reached: hasSusPage, detail: r.sustainability_url ? 'Dedicated page found' : 'No sustainability page found' },
-      { label: 'Carbon data',         base: 4,  reached: hasSusPage && hasCO2 && !hasNZ, detail: r.carbon_data || 'No explicit Scope 1/2/3 data extracted' },
-      { label: 'Net zero target',     base: 12, reached: hasSusPage && hasNZ, detail: hasNZ ? `Target year: ${r.net_zero_target_year}` : 'No net zero target found' },
-    ];
-
-    const bonuses = [
-      { label: 'Sustainability document', pts: r.doc_confidence === 'high' ? 2 : r.doc_confidence === 'medium' ? 1 : 0, earned: !!r.transition_plan_url && (r.doc_confidence === 'high' || r.doc_confidence === 'medium'), detail: r.transition_plan_url ? `${(r.doc_confidence||'low').toUpperCase()} confidence — ${r.transition_plan_title || 'document found'}` : 'No document found' },
-      { label: 'SBTi near-term targets',   pts: 2, earned: r.sbti_near_term_status === 'Targets set', detail: r.sbti_near_term_status || 'Not listed on SBTi' },
-      { label: 'SBTi net zero targets',    pts: 1, earned: r.sbti_net_zero_status  === 'Targets set', detail: r.sbti_net_zero_status  || 'Not listed on SBTi' },
-      { label: 'CDP disclosure',           pts: 1, earned: !!r.cdp_score,     detail: r.cdp_score ? `Score: ${r.cdp_score}` : 'No CDP score found' },
-      { label: 'SME Climate Hub',          pts: 1, earned: !!r.sme_hub_member, detail: r.sme_hub_member ? 'Race to Zero member' : 'Not a member' },
-      { label: 'Certifications',           pts: 1, earned: !!r.certifications, detail: r.certifications || 'No certifications extracted' },
+      { label: 'Sustainability page',         range: '1–5',  reached: tier1, detail: r.sustainability_url ? 'Dedicated page found' : 'No sustainability page found' },
+      { label: 'Carbon / emissions language',  range: '6–11', reached: tier2, detail: tier2Detail },
+      { label: 'Net zero target / CDP / SBTi', range: '12+',  reached: tier3, detail: tier3Detail },
     ];
 
     const tierRows = tiers.map((t, i) => {
-      const isReached   = t.reached;
-      const isNext      = !isReached && (i === 0 || tiers[i-1].reached);
-      const color = isReached ? 'var(--green)' : isNext ? 'var(--amber)' : 'var(--text3)';
-      const icon  = isReached ? '✓' : isNext ? '○' : '–';
-      const detailText  = typeof t.detail === 'string' ? t.detail : String(t.detail||'');
+      const isNext  = !t.reached && (i === 0 || tiers[i-1].reached);
+      const color   = t.reached ? 'var(--green)' : isNext ? 'var(--amber)' : 'var(--text3)';
+      const icon    = t.reached ? '✓' : isNext ? '○' : '–';
+      const detailText = typeof t.detail === 'string' ? t.detail : String(t.detail||'');
       return `<div style="display:grid;grid-template-columns:16px 1fr auto;gap:4px 8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border1);">
         <span style="font-size:.7rem;color:${color};font-weight:700;">${icon}</span>
         <div>
-          <div style="font-size:.75rem;color:${isReached ? 'var(--text1)' : 'var(--text3)'};">${t.label}</div>
+          <div style="font-size:.75rem;color:${t.reached ? 'var(--text1)' : 'var(--text3)'};">${t.label}</div>
           <div style="font-size:.65rem;color:var(--text3);margin-top:1px;line-height:1.3;">${detailText.slice(0,120)}</div>
         </div>
-        <span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${color};white-space:nowrap;">${isReached ? `= ${t.base}` : `/${t.base}`}</span>
-      </div>`;
-    }).join('');
-
-    const bonusRows = bonuses.map(b => {
-      const color = b.earned ? 'var(--sky)' : 'var(--text3)';
-      return `<div style="display:grid;grid-template-columns:16px 1fr auto;gap:4px 8px;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border1);">
-        <span style="font-size:.65rem;color:${color};">${b.earned ? '+' : '–'}</span>
-        <div>
-          <div style="font-size:.72rem;color:${b.earned ? 'var(--text2)' : 'var(--text3)'};">${b.label}</div>
-          <div style="font-size:.63rem;color:var(--text3);margin-top:1px;">${b.detail}</div>
-        </div>
-        <span style="font-family:var(--mono);font-size:.68rem;color:${color};white-space:nowrap;">${b.earned ? `+${b.pts}` : `0/${b.pts}`}</span>
+        <span style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${color};white-space:nowrap;">${t.range}</span>
       </div>`;
     }).join('');
 
     return `
       <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-        <span style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor}">${score}/20</span>
+        <span style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor}">${maturityRange(score)}</span>
         <span style="font-family:var(--mono);font-size:.66rem;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.06);color:${mColor}">${mLabel}</span>
-      </div>
-      <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;margin-bottom:6px;">
-        <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px;">Base score (highest tier reached)</div>
-        ${tierRows}
+        <span style="font-size:.6rem;color:var(--text3);">AI estimate</span>
       </div>
       <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;">
-        <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px;">Bonus points</div>
-        ${bonusRows}
+        <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px;">Scoring tiers</div>
+        ${tierRows}
       </div>`;
   })();
 
@@ -6168,7 +6138,7 @@ function openPanel(r) {
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:.65rem .85rem;">
       <div style="font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.3rem;">Current Score</div>
-      <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${score}/20</div>
+      <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:${mColor};">${maturityRange(score)}</div>
       <div><span class="badge" style="background:rgba(255,255,255,.04);color:${mColor};border:1px solid rgba(255,255,255,.08);font-size:.58rem;margin-top:4px;">${mLabel}</span></div>
       ${aiExpected ? `<div style="margin-top:6px;">${deltaBadge(score, aiExpected.score)}</div>` : ''}
     </div>
@@ -6617,10 +6587,10 @@ document.addEventListener('click', e => {
 
 function getMaturityLabel(score) {
   if (score == null) return '—';
-  if (score >= 14) return 'Leading';
-  if (score >= 10) return 'Advanced';
+  if (score >= 12) return 'Advanced';
   if (score >= 6)  return 'Developing';
-  return 'Early Stage';
+  if (score >= 1)  return 'Early Stage';
+  return 'No Data';
 }
 
 // ── Excel Report ─────────────────────────────────────────────────────────────
@@ -6653,15 +6623,15 @@ async function exportExcel(scope, idx, directR) {
     ['SBTi Aligned', withSBTi, `${Math.round(withSBTi/companies.length*100)}%`, ''],
     ['Manually Verified', verified, `${Math.round(verified/companies.length*100)}%`, ''],
     ['', '', '', ''],
-    ['MATURITY SCORES', '', '', ''],
-    ['Avg AI Score', avgAI + '/20', '', ''],
-    ['Avg Verified Score', avgV + '/20', '', ''],
+    ['AI MATURITY ESTIMATES', '', '', ''],
+    ['AI Score Distribution', '', '', ''],
+    ['12+ (Advanced)',    companies.filter(r => (r.maturity_score ?? calcMaturity(r)) >= 12).length, '', ''],
+    ['6–11 (Developing)', companies.filter(r => { const s=r.maturity_score ?? calcMaturity(r); return s>=6&&s<12; }).length, '', ''],
+    ['1–5 (Early Stage)', companies.filter(r => { const s=r.maturity_score ?? calcMaturity(r); return s>=1&&s<6; }).length, '', ''],
+    ['0 (No Data)',        companies.filter(r => (r.maturity_score ?? calcMaturity(r)) === 0).length, '', ''],
     ['', '', '', ''],
-    ['SCORE DISTRIBUTION', '', '', ''],
-    ['Leading (14-20)', companies.filter(r => (r.manual_maturity_score||r.maturity_score||0) >= 14).length, '', ''],
-    ['Advanced (10-13)', companies.filter(r => { const s=r.manual_maturity_score||r.maturity_score||0; return s>=10&&s<14; }).length, '', ''],
-    ['Developing (6-9)',  companies.filter(r => { const s=r.manual_maturity_score||r.maturity_score||0; return s>=6&&s<10; }).length, '', ''],
-    ['Early Stage (0-5)', companies.filter(r => (r.manual_maturity_score||r.maturity_score||0) < 6).length, '', ''],
+    ['VERIFIED SCORES', '', '', ''],
+    ['Avg Verified Score', avgV != null ? avgV : '—', '', ''],
   ];
 
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
@@ -6787,10 +6757,10 @@ function exportRtf(scope, companies) {
 
   function scoreLabel(s) {
     if (s == null) return '—';
-    if (s >= 14) return 'Leading';
-    if (s >= 10) return 'Advanced';
+    if (s >= 12) return 'Advanced';
     if (s >= 6)  return 'Developing';
-    return 'Early Stage';
+    if (s >= 1)  return 'Early Stage';
+    return 'No Data';
   }
 
   function row(label, value) {
@@ -6824,7 +6794,7 @@ ${rtfEsc(value)}\\cell
 
     // Score summary line
     lines.push(`\\pard\\sb120\\sa120\\box\\brdrs\\brdrw10\\brdrcf5\\bgcolor5
-{\\b AI Score:} ${aiScore}/20 (${scoreLabel(aiScore)})   {\\b Verified:} ${vScore != null ? vScore+'/20' : '—'}   {\\b Status:} ${r.verified_by ? 'Verified' : 'Unverified'}\\par`);
+{\\b AI Score (est.):} ${maturityRange(aiScore)} (${scoreLabel(aiScore)})   {\\b Verified:} ${vScore != null ? vScore : '—'}   {\\b Status:} ${r.verified_by ? 'Verified' : 'Unverified'}\\par`);
 
     // Companies House
     const chRows = [
@@ -6862,7 +6832,7 @@ ${rtfEsc(value)}\\cell
     const expRows = [
       row('AI Expected Score', aiExp ? `${aiExp.label} (${aiExp.band} accounts)` : null),
       row('Verified Expected Score', r.verified_expected_score != null ? `${r.verified_expected_score}/20` : null),
-      row('AI Current Score', r.maturity_score != null ? `${r.maturity_score}/20 — ${scoreLabel(r.maturity_score)}` : null),
+      row('AI Score (est.)', r.maturity_score != null ? `${maturityRange(r.maturity_score)} — ${scoreLabel(r.maturity_score)}` : null),
       row('Verified Current Score', r.manual_maturity_score != null ? `${r.manual_maturity_score}/20 — ${scoreLabel(r.manual_maturity_score)}` : null),
     ].filter(Boolean).join('');
     if (expRows) {
