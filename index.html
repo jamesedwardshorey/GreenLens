@@ -5024,51 +5024,60 @@ async function loadRows(rows) {
 }
 
 function parseRowsToObjects(rows) {
-  const CSV_COL_MAP = {
-    'Company Name':           'company',
-    'Website':                'website',
-    'Sustainability URL':     'sustainability_url',
-    'Transition Plan URL':    'transition_plan_url',
-    'Transition Plan Title':  'transition_plan_title',
-    'Doc Confidence':         'doc_confidence',
-    'Net Zero Year':          'net_zero_target_year',
-    'Net Zero Source':        'net_zero_source',
-    'Net Zero Source URL':    'net_zero_source_url',
-    'SBTi Near Term':         'sbti_near_term_status',
-    'SBTi Net Zero':          'sbti_net_zero_status',
-    'SBTi Temperature':       'sbti_temperature',
-    'CDP Score':              'cdp_score',
-    'SME Hub':                'sme_hub_member',
-    'Maturity Score':         'maturity_score',
-    'Confidence':             'confidence',
-    'Last Run':               'extraction_date',
-    'Summary':                'sustainability_summary',
-    'Certifications':         'certifications',
-    'Emissions Reduction':    'emissions_reduction_target',
-    'Carbon Data':            'carbon_data',
-    'Key Initiatives':        'key_initiatives',
-    'company':'company','website':'website','sustainability_url':'sustainability_url',
-    'transition_plan_url':'transition_plan_url','transition_plan_title':'transition_plan_title',
-    'doc_confidence':'doc_confidence','net_zero_target_year':'net_zero_target_year',
-    'net_zero_source':'net_zero_source','net_zero_source_url':'net_zero_source_url',
-    'sbti_near_term_status':'sbti_near_term_status','sbti_net_zero_status':'sbti_net_zero_status',
-    'sbti_temperature':'sbti_temperature','cdp_score':'cdp_score','sme_hub_member':'sme_hub_member',
-    'sme_hub_url':'sme_hub_url',
-    'maturity_score':'maturity_score','confidence':'confidence','confidence_reasons':'confidence_reasons',
-    'extraction_date':'extraction_date',
-    'sustainability_summary':'sustainability_summary','certifications':'certifications',
-    'emissions_reduction_target':'emissions_reduction_target','carbon_data':'carbon_data',
+  // Normalise header: lowercase, trim, collapse spaces/hyphens to underscores
+  const norm = h => String(h).toLowerCase().trim().replace(/[\s\-]+/g, '_');
+
+  const COL_MAP = {
+    // Company name variants
+    'company_name':'company', 'company':'company', 'companies':'company',
+    'supplier':'company', 'supplier_name':'company',
+    'organisation':'company', 'organization':'company',
+    'business':'company', 'business_name':'company',
+    // Website variants
+    'website':'website', 'web':'website', 'domain':'website',
+    'url':'website', 'web_url':'website', 'website_url':'website',
+    // Sustainability page
+    'sustainability_url':'sustainability_url', 'sus_url':'sustainability_url',
+    'sustainability_page':'sustainability_url', 'sus_page':'sustainability_url',
+    // Transition plan
+    'transition_plan_url':'transition_plan_url',
+    'transition_plan_title':'transition_plan_title',
+    'doc_confidence':'doc_confidence',
+    // Net zero
+    'net_zero_target_year':'net_zero_target_year', 'net_zero_year':'net_zero_target_year',
+    'net_zero_source':'net_zero_source', 'net_zero_source_url':'net_zero_source_url',
+    // SBTi
+    'sbti_near_term_status':'sbti_near_term_status', 'sbti_near_term':'sbti_near_term_status',
+    'sbti_net_zero_status':'sbti_net_zero_status', 'sbti_net_zero':'sbti_net_zero_status',
+    'sbti_temperature':'sbti_temperature',
+    // CDP / SME Hub
+    'cdp_score':'cdp_score', 'cdp':'cdp_score',
+    'sme_hub_member':'sme_hub_member', 'sme_hub':'sme_hub_member', 'sme_hub_url':'sme_hub_url',
+    // Scores & confidence
+    'maturity_score':'maturity_score',
+    'confidence':'confidence', 'confidence_reasons':'confidence_reasons',
+    // Dates & summary
+    'extraction_date':'extraction_date', 'last_run':'extraction_date',
+    'sustainability_summary':'sustainability_summary', 'summary':'sustainability_summary',
+    // Carbon & emissions
+    'certifications':'certifications',
+    'emissions_reduction_target':'emissions_reduction_target', 'emissions_reduction':'emissions_reduction_target',
+    'carbon_data':'carbon_data',
     'key_initiatives':'key_initiatives',
-    'verified_by':'verified_by','verified_at':'verified_at','user_notes':'user_notes',
-    'manual_maturity_score':'manual_maturity_score','manual_maturity_notes':'manual_maturity_notes',
+    // Review fields
+    'verified_by':'verified_by', 'verified_at':'verified_at',
+    'user_notes':'user_notes', 'notes':'user_notes',
+    'manual_maturity_score':'manual_maturity_score', 'manual_maturity_notes':'manual_maturity_notes',
   };
 
   return rows
-    .filter(r => (r['Company Name']||r['company']||'').trim())
     .map((r, i) => {
       const mapped = {};
-      for (const [csvCol, field] of Object.entries(CSV_COL_MAP)) {
-        if (r[csvCol] !== undefined && r[csvCol] !== '') mapped[field] = String(r[csvCol]).trim();
+      for (const [rawKey, rawVal] of Object.entries(r)) {
+        const field = COL_MAP[norm(rawKey)];
+        if (field && rawVal !== undefined && String(rawVal).trim() !== '') {
+          mapped[field] = String(rawVal).trim();
+        }
       }
       const company = mapped.company || '';
       if (!company) return null;
