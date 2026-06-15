@@ -4265,7 +4265,8 @@ function calcMaturity(r) {
   if (r.cdp_score) return 12;
   if (r.sbti_near_term_status === 'Targets set' || r.sbti_net_zero_status === 'Targets set') return 12;
   if (r.net_zero_target_year) return 12;
-  // Tier 6-11: any carbon/emissions/target language found on the sustainability page
+  // Tier 6-11: document found, or any carbon/emissions/target language on the sustainability page
+  if (r.transition_plan_url) return 6;
   if (r.carbon_data && r.carbon_data.trim()) return 6;
   if (r.emissions_reduction_target && r.emissions_reduction_target.trim()) return 6;
   const summary = (r.sustainability_summary || r.key_initiatives || '').toLowerCase();
@@ -5876,7 +5877,9 @@ function openPanel(r) {
     const hasSBTi    = r.sbti_near_term_status === 'Targets set' || r.sbti_net_zero_status === 'Targets set';
     const hasSusPage = !!r.sustainability_url;
     const summary    = (r.sustainability_summary || r.key_initiatives || '').toLowerCase();
-    const hasCarbonLang = !!(r.carbon_data && r.carbon_data.trim())
+    const hasDoc      = !!r.transition_plan_url;
+    const hasCarbonLang = hasDoc
+      || !!(r.carbon_data && r.carbon_data.trim())
       || !!(r.emissions_reduction_target && r.emissions_reduction_target.trim())
       || /carbon|emission|ghg|scope [123]|footprint|tco2|climate target|reduction target|net.?zero/.test(summary);
     const tier3 = hasSusPage && (hasNZ || hasCDP || hasSBTi);
@@ -5885,6 +5888,7 @@ function openPanel(r) {
 
     const tier2Detail = tier3
       ? (hasNZ ? `Net zero target: ${r.net_zero_target_year}` : hasCDP ? `CDP score: ${r.cdp_score}` : 'SBTi targets confirmed')
+      : hasDoc ? `Document found: ${r.transition_plan_title || r.transition_plan_url.split('/').pop() || 'sustainability document'}`
       : r.carbon_data || r.emissions_reduction_target || 'Carbon/emissions terms found in page text';
     const tier3Detail = hasNZ ? `Target year: ${r.net_zero_target_year}`
       : hasCDP ? `CDP score: ${r.cdp_score}`
@@ -5893,7 +5897,7 @@ function openPanel(r) {
 
     const tiers = [
       { label: 'Sustainability page',         range: '1–5',  reached: tier1, detail: r.sustainability_url ? 'Dedicated page found' : 'No sustainability page found' },
-      { label: 'Carbon / emissions language',  range: '6–11', reached: tier2, detail: tier2Detail },
+      { label: 'Carbon / emissions language or document found', range: '6–11', reached: tier2, detail: tier2Detail },
       { label: 'Net zero target / CDP / SBTi', range: '12+',  reached: tier3, detail: tier3Detail },
     ];
 
