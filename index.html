@@ -2257,7 +2257,7 @@ async function loadResultsFromDb() {
       if (!Array.isArray(mapped.confidence_reasons) && mapped.confidence_reasons) {
         try { mapped.confidence_reasons = JSON.parse(mapped.confidence_reasons); } catch {}
       }
-      mapped.maturity_score = mapped.maturity_score ? Number(mapped.maturity_score) : calcMaturity(mapped);
+      mapped.maturity_score = calcMaturity(mapped);
       _rByIdx[i] = mapped;
       dbMerge(mapped);
       return mapped;
@@ -5190,8 +5190,7 @@ function commitImport(parsed, dupMode) {
     }
 
     base._idx = i;
-    if (base.maturity_score) base.maturity_score = Number(base.maturity_score) || calcMaturity(base);
-    else base.maturity_score = calcMaturity(base);
+    base.maturity_score = calcMaturity(base);
     if (base.confidence_reasons && typeof base.confidence_reasons === 'string') {
       try { base.confidence_reasons = JSON.parse(base.confidence_reasons); } catch { base.confidence_reasons = []; }
     }
