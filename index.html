@@ -2487,16 +2487,24 @@ async function scanAndExtractSusPage(url, companyName, opts={}) {
     return { url, is_valid: false };
   }
 
-  // Quick keyword check on body — reject if no sustainability substance
-  // Exception: if URL explicitly names a sustainability/ESG page, proxy may be serving a cookie wall
-  const urlPathForCheck = (() => { try { return new URL(url).pathname.toLowerCase(); } catch { return ''; } })();
-  const urlIsExplicitSus = /sustainab|esg|environment|carbon|net.?zero|climate|responsib|csr/i.test(urlPathForCheck);
-  if (!urlIsExplicitSus && !/net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]|ghg|greenhouse/i.test(text.slice(0, 5000))) {
-    log('a', `  Page body lacks sustainability content — likely a redirect or generic page`);
+  // Detect cookie consent walls — always reject regardless of URL name
+  // Count cookie/consent terms vs sustainability terms; a page dominated by cookie language has nothing useful
+  const lowerTextCheck = text.toLowerCase();
+  const cookieHits   = (lowerTextCheck.match(/\bcookies?\b/g) || []).length;
+  const consentHits  = (lowerTextCheck.match(/\b(accept|decline|consent|gdpr|preferences?|tracking|functional|analytics|necessary)\b/g) || []).length;
+  const susHitsCheck = (lowerTextCheck.slice(0, 5000).match(/\b(sustainab|carbon|emission|climate|net.zero|esg|renewable|scope|ghg)\b/g) || []).length;
+  if (cookieHits >= 4 && consentHits >= 3 && susHitsCheck < 2) {
+    log('a', `  Cookie consent wall detected — rejecting: ${url}`);
     return { url, is_valid: false };
   }
-  // If URL is sus-named but body lacks keywords — proxy may be returning a cookie wall; proceed with text fallback
-  const hasSusBody = /net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]|ghg|greenhouse/i.test(text.slice(0, 5000));
+
+  // Reject pages without sustainability keywords — applies to ALL URLs including explicit sus paths
+  // (homepage redirects and cookie walls both fail this check, which is correct)
+  if (!/net.?zero|carbon|sustainab|esg|emission|climate|renewable|scope\s*[123]|ghg|greenhouse/i.test(text.slice(0, 5000))) {
+    log('a', `  Page body lacks sustainability content — likely a redirect, cookie wall, or generic page`);
+    return { url, is_valid: false };
+  }
+  const hasSusBody = true;
 
   // Regex-based net zero year (always run — fast, no AI needed)
   // Only accept explicit "net zero by YEAR" — not emissions reduction targets
