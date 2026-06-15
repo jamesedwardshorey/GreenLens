@@ -1485,10 +1485,10 @@ function chExpectedScore(accountsType) {
   if (!accountsType) return null;
   const t = accountsType.toLowerCase();
   // Total exemption full = very small SME — check before generic 'full' match
-  if (/total.exemption/.test(t)) return { score: 1,  label: '1–5',  band: 'Total Exemption', color: 'var(--text3)' };
+  if (/total.exemption/.test(t)) return { score: 1,  label: '1–5',  band: 'Total Exemption', color: 'var(--sky)' };
   if (/full|group|audited/.test(t)) return { score: 12, label: '12+', band: 'Full/Group',      color: 'var(--green)' };
   if (/small|abbreviated|unaudited/.test(t)) return { score: 6,  label: '6–11', band: 'Small', color: 'var(--amber)' };
-  if (/micro|exemption|dormant|initial/.test(t)) return { score: 1,  label: '1–5',  band: 'Micro/Exempt', color: 'var(--text3)' };
+  if (/micro|exemption|dormant|initial/.test(t)) return { score: 1,  label: '1–5',  band: 'Micro/Exempt', color: 'var(--sky)' };
   return null;
 }
 
