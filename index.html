@@ -2702,12 +2702,16 @@ async function extractNZFromPageText(url, company) {
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-    // Only accept explicit "net zero by YEAR" or "carbon neutral by YEAR" — not reduction targets
+    // Accept explicit net zero / carbon neutral year commitments
     const patterns = [
       /\bnet[\s-]?zero\b[^.!?]{0,80}by\s+(20\d{2})/gi,
       /\bcarbon[\s-]?neutral(?:ity)?\b[^.!?]{0,60}by\s+(20\d{2})/gi,
-      /(?:achieve|reach|become|attain|commit[a-z]*)\s+(?:to\s+)?net[\s-]?zero[^.!?]{0,60}(20\d{2})/gi,
+      /(?:achieve|reach|become|attain|commit[a-z]*)\s+(?:to\s+)?(?:be\s+)?net[\s-]?zero[^.!?]{0,80}(20\d{2})/gi,
       /net[\s-]?zero\s+(?:by\s+)?(20\d{2})/gi,
+      /(?:target|goal|aim[a-z]*|commit[a-z]*)[^.!?]{0,60}net[\s-]?zero[^.!?]{0,60}(20\d{2})/gi,
+      /(?:reach|achieve|hit)\s+(?:that\s+)?(?:net[\s-]?zero\s+)?target\s+by\s+(20\d{2})/gi,
+      /zero\s+carbon\s+(?:emissions?\s+)?by\s+(20\d{2})/gi,
+      /climate\s+(?:neutral|net\s*zero)\s+by\s+(20\d{2})/gi,
     ];
 
     let bestYear = null;
@@ -3610,9 +3614,31 @@ function getDocTitle(url) {
 }
 
 // ── Net zero target search ───────────────────────────────────────────────────
-// Only called when page-level extraction found nothing.
-// Uses AI knowledge fallback only — DDG snippets are too unreliable to trust.
-async function findNetZeroTarget(company) {
+// Called when page-level extraction found nothing.
+// First tries live web search on company domain and general search, then AI fallback.
+async function findNetZeroTarget(company, website) {
+  const clean = cleanCompanyName(company);
+
+  // Step 1: live web search — fetch real pages and run regex on them
+  const searchQueries = website
+    ? [`site:${website} net zero`, `${clean} net zero target`]
+    : [`"${clean}" net zero target`];
+
+  for (const q of searchQueries) {
+    log('b', `  NZ web search: "${q}"`);
+    const urls = await multiSearch(q, null);
+    for (const url of urls.slice(0, 3)) {
+      try {
+        const result = await extractNZFromPageText(url, company);
+        if (result) {
+          log('g', `  NZ from web search (${url}): ${result.year} — "${result.snippet}"`);
+          return result;
+        }
+      } catch {}
+    }
+  }
+
+  // Step 2: AI knowledge fallback
   if (!aiEnabled()) return null;
   log('b', `  AI looking up net zero target for "${company}"...`);
   const answer = await aiAsk(
@@ -4135,7 +4161,7 @@ async function processOne(row) {
     if (pageNZ) { nzYear = pageNZ.year; nzSource = pageNZ.source; nzSourceUrl = pageNZ.source_url; }
   }
   if (!nzYear) {
-    const nzRes = await findNetZeroTarget(company);
+    const nzRes = await findNetZeroTarget(company, website);
     if (nzRes) { nzYear = nzRes.year; nzSource = nzRes.source || 'web search'; nzSourceUrl = nzRes.source_url || null; }
   }
 
