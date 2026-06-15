@@ -2563,7 +2563,7 @@ async function scanAndExtractSusPage(url, companyName, opts={}) {
     `You are reviewing a web page for "${companyName}".\n` +
     `Does this page contain substantive sustainability or environmental content? ACCEPT: sustainability pages, ESG pages, carbon/net zero plans, climate pages, corporate responsibility pages, environmental policy pages, OR any page with emissions data. REJECT only: generic homepages with zero sustainability content, unrelated news/press, cookie/privacy/legal pages, whistleblowing pages, investor relations pages.\n` +
     `Extract data and reply ONLY with JSON (null for any field not found):\n` +
-    `{"is_valid_sus_page":true/false,"rejection_reason":"<brief reason if false, else null>","net_zero_target_year":<4-digit year or null>,"net_zero_source":"<e.g. stated on sustainability page>","emissions_reduction_target":"<e.g. 50% Scope 1&2 reduction by 2030 vs 2018>","carbon_data":"<e.g. Scope 1: 12,345 tCO2e, Scope 2: 4,567 tCO2e, Scope 3: 89,012 tCO2e>","sustainability_summary":"<2-3 sentence summary>","certifications":"<comma-separated e.g. ISO 14001, B Corp, TCFD>","key_initiatives":"<comma-separated>"}\n\n` +
+    `{"is_valid_sus_page":true/false,"rejection_reason":"<brief reason if false, else null>","net_zero_target_year":<4-digit year or null>,"net_zero_source":"<exact verbatim quote from page confirming the net zero target, e.g. 'We aim to be net zero by 2045 across all our operations'>","emissions_reduction_target":"<e.g. 50% Scope 1&2 reduction by 2030 vs 2018>","carbon_data":"<e.g. Scope 1: 12,345 tCO2e, Scope 2: 4,567 tCO2e, Scope 3: 89,012 tCO2e>","sustainability_summary":"<2-3 sentence summary>","certifications":"<comma-separated e.g. ISO 14001, B Corp, TCFD>","key_initiatives":"<comma-separated>"}\n\n` +
     `For carbon_data: scan carefully for Scope 1/2/3 figures — they are often in tables (rows shown pipe-separated below). Format as "Scope 1: X tCO2e, Scope 2: Y tCO2e, Scope 3: Z tCO2e".\n` +
     `For net_zero_target_year: only the year full net zero is reached across ALL scopes — not an interim target.\n\n` +
     `Page content:\n${tableText.slice(0, 6000)}`,
@@ -2738,7 +2738,7 @@ async function extractNZFromPageText(url, company) {
     if (bestYear) {
       const domain = new URL(url).hostname.replace('www.','');
       log('g', `  Net zero from page: ${bestYear} — "${bestSnippet}"`);
-      return { year: String(bestYear), source: domain, source_url: url, snippet: bestSnippet };
+      return { year: String(bestYear), source: bestSnippet, source_url: url };
     }
   } catch (e) { log('r', `  extractNZFromPageText error: ${e.message}`); }
   return null;
@@ -3654,7 +3654,7 @@ async function findNetZeroTarget(company, website) {
     const parsed = JSON.parse(answer.replace(/```json|```/g,'').trim());
     if (parsed.year && String(parsed.year).match(/^20[2-6]\d$/) && parsed.confidence === 'high' && parsed.quote) {
       log('g', `  AI found net zero target: ${parsed.year} — "${parsed.quote}"`);
-      return { year: String(parsed.year), source: parsed.source || 'AI knowledge', source_url: null, snippet: parsed.quote };
+      return { year: String(parsed.year), source: parsed.quote || parsed.source || null, source_url: null };
     } else if (parsed.year) {
       log('b', `  AI suggested ${parsed.year} but confidence="${parsed.confidence}" or no quote — discarding`);
     }
@@ -5513,19 +5513,20 @@ function renderTable(data) {
       const badgeRow = badges.length ? `<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px;">${badges.join('')}</div>` : '';
 
       if (r.net_zero_target_year) {
-        const src = r.net_zero_source
-          || (r.sustainability_url ? (() => { try { return new URL(r.sustainability_url).hostname.replace('www.',''); } catch { return null; } })() : null)
-          || 'web search';
-        const srcUrl = r.net_zero_source_url || r.sustainability_url || null;
-        const srcDisplay = srcUrl
-          ? `<a href="${srcUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:.58rem;color:var(--sky);text-decoration:none;overflow:hidden;text-overflow:ellipsis;max-width:120px;display:block;" title="${srcUrl}">&#x2197; ${src}</a>`
-          : `<div style="font-size:.58rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;max-width:120px;" title="${src}">via ${src}</div>`;
+        const srcUrl2 = r.net_zero_source_url || r.sustainability_url || null;
+        const srcDomain2 = srcUrl2 ? (() => { try { return new URL(srcUrl2).hostname.replace('www.',''); } catch { return null; } })() : null;
+        const nzQ = r.net_zero_source && r.net_zero_source.length > 20 ? r.net_zero_source : null;
+        const srcDisplay = srcUrl2
+          ? `<a href="${srcUrl2}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:.58rem;color:var(--sky);text-decoration:none;overflow:hidden;text-overflow:ellipsis;max-width:150px;display:block;" title="${srcUrl2}">&#x2197; ${srcDomain2 || 'source'}</a>`
+          : '';
+        const quoteDisplay = nzQ ? `<div style="font-size:.6rem;color:var(--text2);font-style:italic;line-height:1.35;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:180px;" title="${nzQ.replace(/"/g,'&quot;')}">"${nzQ.slice(0,120)}${nzQ.length>120?'…':''}"</div>` : '';
         return '<div style="display:flex;flex-direction:column;gap:1px;">'
           + '<div style="display:flex;align-items:center;gap:3px;">'
           + `<span style="font-family:var(--mono);font-weight:600;">${r.net_zero_target_year}</span>`
           + `<button onclick="rejectNetZeroTarget(${idx})" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:.7rem;padding:0 0 0 2px;line-height:1;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715;</button>`
           + '</div>'
           + srcDisplay
+          + quoteDisplay
           + badgeRow
           + '</div>';
       }
@@ -5955,17 +5956,17 @@ function openPanel(r) {
   })();
 
   // Net zero field with manual entry
-  const nzSource_display = r.net_zero_source
-    || (r.sustainability_url ? (() => { try { return new URL(r.sustainability_url).hostname.replace('www.',''); } catch { return null; } })() : null)
-    || 'web search';
   const nzSource_url = r.net_zero_source_url || r.sustainability_url || null;
+  const nzSourceDomain = nzSource_url ? (() => { try { return new URL(nzSource_url).hostname.replace('www.',''); } catch { return null; } })() : null;
+  const nzQuote = r.net_zero_source && r.net_zero_source.length > 20 ? r.net_zero_source : null;
   const nzSourceLink = nzSource_url
-    ? `<a href="${nzSource_url}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;font-family:var(--mono);font-size:.62rem;" title="${nzSource_url}">&#x2197; ${nzSource_display}</a>`
-    : `<span style="font-family:var(--mono);font-size:.62rem;color:var(--text3);">via ${nzSource_display}</span>`;
+    ? `<a href="${nzSource_url}" target="_blank" rel="noopener" style="color:var(--sky);text-decoration:none;font-family:var(--mono);font-size:.62rem;" title="${nzSource_url}">&#x2197; ${nzSourceDomain || 'source'}</a>`
+    : `<span style="font-family:var(--mono);font-size:.62rem;color:var(--text3);">via ${r.net_zero_source || 'web search'}</span>`;
   const nzFieldHtml = r.net_zero_target_year
     ? `<span style="font-family:var(--mono);color:var(--lime);font-size:.9rem;">${r.net_zero_target_year}</span>
+       <button onclick="rejectNetZeroTarget(${r._idx})" title="Remove" style="background:none;border:1px solid rgba(248,113,113,.3);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.65rem;padding:1px 7px;margin-left:8px;" onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.3)'">&#x2715;</button>
        ${nzSourceLink}
-       <button onclick="rejectNetZeroTarget(${r._idx})" title="Remove" style="background:none;border:1px solid rgba(248,113,113,.3);border-radius:4px;cursor:pointer;color:var(--text3);font-size:.65rem;padding:1px 7px;margin-left:8px;" onmouseover="this.style.color='var(--red)';this.style.borderColor='rgba(248,113,113,.6)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='rgba(248,113,113,.3)'">&#x2715;</button>`
+       ${nzQuote ? `<div style="margin-top:5px;padding:5px 8px;background:rgba(255,255,255,.04);border-left:2px solid var(--lime);border-radius:0 4px 4px 0;font-size:.68rem;color:var(--text2);line-height:1.45;font-style:italic;">"${nzQuote.replace(/"/g,'&quot;').slice(0, 200)}${nzQuote.length > 200 ? '…' : ''}"</div>` : ''}`
     : (() => {
         const notFound = r.sustainability_url && r.status === 'Success';
         return (notFound ? `<div style="font-family:var(--mono);font-size:.75rem;color:var(--text3);font-style:italic;margin-bottom:6px;">No net zero target found on sustainability page</div>` : '')
@@ -6683,7 +6684,7 @@ async function exportExcel(scope, idx, directR) {
     // Key sustainability columns (user-requested order)
     'Sustainability Page', 'Sustainability Page Link', 'Sustainability Page Text Extracted',
     'Carbon Data Confirmed?', 'Carbon Evidence Text',
-    'Net Zero Target Year', 'Net Zero Evidence Link', 'Net Zero Source',
+    'Net Zero Target Year', 'Net Zero Evidence Link', 'Net Zero Evidence Quote',
     // AI scoring
     'AI Score (est.)', 'AI Score Label',
     // Verification badges
@@ -6753,7 +6754,7 @@ async function exportExcel(scope, idx, directR) {
     {wch:30},{wch:28},                                    // Company, Website
     {wch:10},{wch:50},{wch:65},                           // Sus Page, Link, Text
     {wch:12},{wch:65},                                    // Carbon Confirmed, Evidence
-    {wch:14},{wch:50},{wch:35},                           // NZ Year, Evidence Link, Source
+    {wch:14},{wch:50},{wch:80},                           // NZ Year, Evidence Link, Quote
     {wch:14},{wch:16},                                    // AI Score, Label
     {wch:22},{wch:10},{wch:8},                            // SBTi, CDP, SME Hub
     {wch:45},{wch:35},{wch:45},                           // Initiatives, Certs, Key Doc
@@ -6874,6 +6875,8 @@ ${rtfEsc(value)}\\cell
       row('Sustainability Page', r.sustainability_url),
       row('Summary', r.sustainability_summary),
       row('Net Zero Target', r.net_zero_target_year),
+      row('Net Zero Evidence Quote', r.net_zero_source || null),
+      row('Net Zero Evidence Link', r.net_zero_source_url || null),
       row('Carbon Data', r.carbon_data),
       row('SBTi', r.sbti_net_zero_status || r.sbti_near_term_status),
       row('CDP Score', r.cdp_score),
