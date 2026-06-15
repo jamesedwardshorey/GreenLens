@@ -6649,88 +6649,111 @@ async function exportExcel(scope, idx, directR) {
 
   // ── Sheet 2: Full Data ──────────────────────────────────────────────────────
   const HEADERS = [
-    'Company','Registered Name','Company No.','Industry','Accounts Type',
-    'Website','Sus Page','Sus Page URL','Sus Summary',
-    'Net Zero Target','Net Zero Evidence','Key Document',
-    'Carbon Data','SBTi Status','CDP Score','SME Hub',
-    'AI Score','AI Label','Verified Score','Expected Score','Delta vs Expected',
-    'Verified By','Verified Date','Notes',
-    'Certifications','Key Initiatives','Confidence','Confidence Notes',
-    'UNFCCC GCAP ID','UNFCCC Profile','Last Run'
+    // Core identity
+    'Company', 'Website',
+    // Key sustainability columns (user-requested order)
+    'Sustainability Page', 'Sustainability Page Link', 'Sustainability Page Text Extracted',
+    'Carbon Data Confirmed?', 'Carbon Evidence Text',
+    'Net Zero Target Year', 'Net Zero Evidence Link', 'Net Zero Source',
+    // AI scoring
+    'AI Score (est.)', 'AI Score Label',
+    // Verification badges
+    'SBTi Status', 'CDP Score', 'SME Hub',
+    // Supporting data
+    'Key Initiatives', 'Certifications', 'Key Document',
+    // Human review
+    'Verified Score', 'Verified By', 'Verified Date', 'Notes',
+    // Confidence
+    'Confidence', 'Confidence Notes',
+    // Companies House
+    'Registered Name', 'Company No.', 'Industry', 'Accounts Type',
+    // Meta
+    'Last Run',
   ];
   const rows = companies.map(r => {
-    const aiScore = r.maturity_score ?? 0;
-    const vScore  = r.manual_maturity_score;
-    const exp     = r.verified_expected_score ?? (chExpectedScore(r.ch_accounts_type)?.score);
-    const delta   = (vScore != null && exp != null) ? vScore - exp : (exp != null ? aiScore - exp : null);
-    const confNotes = Array.isArray(r.confidence_reasons) ? r.confidence_reasons.join(' | ') : (r.confidence_reasons || '');
-    // Net zero evidence: source description + URL if available
-    const nzEvidence = [r.net_zero_source, r.net_zero_source_url].filter(Boolean).join(' — ');
+    const aiScore    = r.maturity_score ?? calcMaturity(r);
+    const vScore     = r.manual_maturity_score;
+    const confNotes  = Array.isArray(r.confidence_reasons) ? r.confidence_reasons.join(' | ') : (r.confidence_reasons || '');
+    const carbonText = [r.carbon_data, r.emissions_reduction_target].filter(Boolean).join(' | ');
+    const carbonConfirmed = (r.carbon_data && r.carbon_data.trim()) || (r.emissions_reduction_target && r.emissions_reduction_target.trim()) ? 'Yes' : 'No';
     return [
       r.company || '',
+      r.website || '',
+      // Sustainability
+      r.sustainability_url ? 'Yes' : 'No',
+      r.sustainability_url || '',
+      r.sustainability_summary || '',
+      // Carbon
+      carbonConfirmed,
+      carbonText,
+      // Net zero
+      r.net_zero_target_year || '',
+      r.net_zero_source_url || '',
+      r.net_zero_source || '',
+      // AI score
+      maturityRange(aiScore),
+      getMaturityLabel(aiScore),
+      // Badges
+      r.sbti_net_zero_status || r.sbti_near_term_status || '',
+      r.cdp_score || '',
+      r.sme_hub_member ? 'Yes' : 'No',
+      // Supporting
+      r.key_initiatives || '',
+      r.certifications || '',
+      r.transition_plan_url || '',
+      // Human review
+      vScore != null ? vScore : '',
+      r.verified_by || '',
+      r.verified_at ? new Date(r.verified_at).toLocaleDateString('en-GB') : '',
+      r.user_notes || '',
+      // Confidence
+      r.confidence || '',
+      confNotes,
+      // CH
       r.ch_registered_name || '',
       r.ch_company_number || '',
       r.ch_industry || '',
       r.ch_accounts_type || '',
-      r.website || '',
-      r.sustainability_url ? 'Yes' : 'No',
-      r.sustainability_url || '',
-      r.sustainability_summary || '',
-      r.net_zero_target_year || '',
-      nzEvidence,
-      r.transition_plan_url || '',
-      r.carbon_data || '',
-      r.sbti_net_zero_status || r.sbti_near_term_status || '',
-      r.cdp_score || '',
-      r.sme_hub_member ? 'Yes' : 'No',
-      aiScore || '',
-      getMaturityLabel(aiScore),
-      vScore != null ? vScore : '',
-      exp != null ? exp : '',
-      delta != null ? (delta >= 0 ? '+' + delta : delta) : '',
-      r.verified_by || '',
-      r.verified_at ? new Date(r.verified_at).toLocaleDateString('en-GB') : '',
-      r.user_notes || '',
-      r.certifications || '',
-      r.key_initiatives || '',
-      r.confidence || '',
-      confNotes,
-      r.unfccc_gcap_id || '',
-      r.unfccc_url || '',
+      // Meta
       r.extraction_date ? new Date(r.extraction_date).toLocaleDateString('en-GB') : '',
     ];
   });
 
   const dataWs = XLSX.utils.aoa_to_sheet([HEADERS, ...rows]);
-  // Column widths
   dataWs['!cols'] = [
-    {wch:30},{wch:30},{wch:14},{wch:22},{wch:18},   // Company … Accounts Type
-    {wch:25},{wch:8},{wch:45},{wch:55},              // Website … Sus Summary
-    {wch:12},{wch:50},{wch:45},                      // Net Zero, Evidence, Key Document
-    {wch:35},{wch:20},{wch:10},{wch:8},              // Carbon … SME Hub
-    {wch:10},{wch:14},{wch:14},{wch:14},{wch:16},    // Scores
-    {wch:22},{wch:14},{wch:35},                      // Verified … Notes
-    {wch:35},{wch:35},{wch:10},{wch:55},             // Certs … Confidence Notes
-    {wch:14},{wch:50},{wch:14},                      // UNFCCC … Last Run
+    {wch:30},{wch:28},                                    // Company, Website
+    {wch:10},{wch:50},{wch:65},                           // Sus Page, Link, Text
+    {wch:12},{wch:65},                                    // Carbon Confirmed, Evidence
+    {wch:14},{wch:50},{wch:35},                           // NZ Year, Evidence Link, Source
+    {wch:14},{wch:16},                                    // AI Score, Label
+    {wch:22},{wch:10},{wch:8},                            // SBTi, CDP, SME Hub
+    {wch:45},{wch:35},{wch:45},                           // Initiatives, Certs, Key Doc
+    {wch:14},{wch:22},{wch:14},{wch:35},                  // Verified…
+    {wch:10},{wch:55},                                    // Confidence
+    {wch:30},{wch:14},{wch:22},{wch:18},                  // CH fields
+    {wch:14},                                             // Last Run
   ];
-  // Freeze top row
   dataWs['!freeze'] = { xSplit: 0, ySplit: 1 };
   XLSX.utils.book_append_sheet(wb, dataWs, 'All Companies');
 
   // ── Sheet 3: Verification Status ───────────────────────────────────────────
-  const verHeaders = ['Company','Status','AI Score','Verified Score','Questions Answered','Verified By','Verified Date','Notes'];
-  const verRows = companies.map(r => [
-    r.company || '',
-    r.verified_by ? 'Verified' : 'Not verified',
-    r.maturity_score != null ? r.maturity_score : '',
-    r.manual_maturity_score != null ? r.manual_maturity_score : '',
-    r.manual_assessment ? Object.values(r.manual_assessment).filter(v => v != null && v !== 0).length : 0,
-    r.verified_by || '',
-    r.verified_at ? new Date(r.verified_at).toLocaleDateString('en-GB') : '',
-    r.user_notes || '',
-  ]);
+  const verHeaders = ['Company','Status','AI Score (est.)','AI Label','Verified Score','Questions Answered','Verified By','Verified Date','Notes'];
+  const verRows = companies.map(r => {
+    const aiScore = r.maturity_score ?? calcMaturity(r);
+    return [
+      r.company || '',
+      r.verified_by ? 'Verified' : 'Not verified',
+      maturityRange(aiScore),
+      getMaturityLabel(aiScore),
+      r.manual_maturity_score != null ? r.manual_maturity_score : '',
+      r.manual_assessment ? Object.values(r.manual_assessment).filter(v => v != null && v !== 0).length : 0,
+      r.verified_by || '',
+      r.verified_at ? new Date(r.verified_at).toLocaleDateString('en-GB') : '',
+      r.user_notes || '',
+    ];
+  });
   const verWs = XLSX.utils.aoa_to_sheet([verHeaders, ...verRows]);
-  verWs['!cols'] = [{wch:30},{wch:14},{wch:10},{wch:14},{wch:18},{wch:22},{wch:14},{wch:40}];
+  verWs['!cols'] = [{wch:30},{wch:14},{wch:14},{wch:16},{wch:14},{wch:18},{wch:22},{wch:14},{wch:40}];
   verWs['!freeze'] = { xSplit: 0, ySplit: 1 };
   XLSX.utils.book_append_sheet(wb, verWs, 'Verification Status');
 
