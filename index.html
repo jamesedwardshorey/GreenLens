@@ -2701,7 +2701,10 @@ async function aiExtractSusData(susUrl, companyName) {
 
 // Extract net zero year directly from page text via regex — no AI needed
 // Returns { year, source, source_url, snippet } or null
-async function extractNZFromPageText(url, company) {
+// website: if provided, pages on the company's own domain are trusted outright; pages on
+// any OTHER domain (e.g. search results) must actually name the company near the target,
+// otherwise we risk attributing an unrelated page's target (e.g. a government policy page) to this company.
+async function extractNZFromPageText(url, company, website) {
   try {
     const html = await proxyFetch(url, 12000);
     if (!html) return null;
@@ -2709,6 +2712,37 @@ async function extractNZFromPageText(url, company) {
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const lowerText = text.toLowerCase();
+
+    let sameDomain = false;
+    if (website) {
+      try {
+        const pageHost = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+        const siteHost = String(website).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase();
+        sameDomain = !!siteHost && (pageHost === siteHost || pageHost.endsWith('.' + siteHost) || siteHost.endsWith('.' + pageHost));
+      } catch {}
+    }
+
+    const cleanLower = cleanCompanyName(company).toLowerCase();
+    const nameWords = cleanLower.split(' ').filter(Boolean);
+    function companyMentionedNear(pos, radius = 400) {
+      const window = lowerText.slice(Math.max(0, pos - radius), Math.min(lowerText.length, pos + radius));
+      if (cleanLower && window.includes(cleanLower)) return true;
+      if (nameWords.length > 1) return nameWords.every(w => w.length < 4 || window.includes(w));
+      if (nameWords.length === 1) return new RegExp(`\\b${nameWords[0]}\\b`).test(window);
+      return false;
+    }
+
+    // For pages NOT confirmed to be on the company's own domain, the page must at least
+    // name the company somewhere — otherwise it's almost certainly an unrelated page
+    // (e.g. a generic government guidance page) that happened to match a search query.
+    if (!sameDomain) {
+      const mentionedAnywhere = cleanLower && (lowerText.includes(cleanLower) || nameWords.some(w => w.length >= 4 && lowerText.includes(w)));
+      if (!mentionedAnywhere) {
+        log('a', `  Page ${url} doesn't mention "${company}" — rejecting as unrelated to this company`);
+        return null;
+      }
+    }
 
     // Accept explicit net zero / carbon neutral year commitments
     const patterns = [
@@ -2731,6 +2765,9 @@ async function extractNZFromPageText(url, company) {
       while ((m = pattern.exec(text)) !== null) {
         const y = parseInt(m[1]);
         if (y < 2025 || y > 2060) continue;
+        // For off-domain pages, this specific match must sit near a mention of the company —
+        // otherwise it could be someone else's target on a page that just happens to name us too
+        if (!sameDomain && !companyMentionedNear(m.index)) continue;
         // Extract the surrounding sentence as a quote
         const start = Math.max(0, m.index - 20);
         const end = Math.min(text.length, m.index + m[0].length + 40);
@@ -3637,7 +3674,7 @@ async function findNetZeroTarget(company, website) {
     const urls = await multiSearch(q, null);
     for (const url of urls.slice(0, 3)) {
       try {
-        const result = await extractNZFromPageText(url, company);
+        const result = await extractNZFromPageText(url, company, website);
         if (result) {
           log('g', `  NZ from web search (${url}): ${result.year} — "${result.snippet}"`);
           return result;
@@ -4165,7 +4202,7 @@ async function processOne(row) {
   }
   // Page text regex pass (works without AI key)
   if (!nzYear && susUrl) {
-    const pageNZ = await extractNZFromPageText(susUrl, company);
+    const pageNZ = await extractNZFromPageText(susUrl, company, website);
     if (pageNZ) { nzYear = pageNZ.year; nzSource = pageNZ.source; nzSourceUrl = pageNZ.source_url; }
   }
   if (!nzYear) {
@@ -4561,7 +4598,7 @@ async function reRunSusPage(idx, urlOverride) {
     if (!r.transition_plan_url) r.transition_plan_url = await findReportUrl(r.website, r.company);
 
     // Always scan the page directly for net zero year (no AI key needed)
-    const pageNZ = await extractNZFromPageText(trimmed, r.company);
+    const pageNZ = await extractNZFromPageText(trimmed, r.company, r.website);
     if (pageNZ) {
       r.net_zero_target_year = pageNZ.year;
       r.net_zero_source      = pageNZ.source;
@@ -4569,7 +4606,7 @@ async function reRunSusPage(idx, urlOverride) {
     }
     // Also run DDG search if page scan found nothing
     if (!r.net_zero_target_year) {
-      const _nzR = await findNetZeroTarget(r.company);
+      const _nzR = await findNetZeroTarget(r.company, r.website);
       if (_nzR) { r.net_zero_target_year = _nzR.year; r.net_zero_source = _nzR.source; r.net_zero_source_url = _nzR.source_url || null; }
     }
 
@@ -4620,7 +4657,7 @@ async function reRunSusPage(idx, urlOverride) {
     if (r.sustainability_url) {
       r.status = 'Success';
       if (!r.transition_plan_url) r.transition_plan_url = await findReportUrl(r.website, r.company);
-      const _nzR = await findNetZeroTarget(r.company); if (_nzR) { r.net_zero_target_year = _nzR.year; r.net_zero_source = _nzR.source; r.net_zero_source_url = _nzR.source_url || null; }
+      const _nzR = await findNetZeroTarget(r.company, r.website); if (_nzR) { r.net_zero_target_year = _nzR.year; r.net_zero_source = _nzR.source; r.net_zero_source_url = _nzR.source_url || null; }
       const [sbtiRes, cdpRes, smeRes, unfcccRes] = await Promise.all([
         checkSBTi(r.company).catch(()=>null),
         checkCDP(r.company).catch(()=>null),
